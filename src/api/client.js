@@ -1,0 +1,41 @@
+import axios from 'axios';
+import { Platform } from 'react-native';
+
+// Konfigurasi URL API
+// Gunakan IP laptop (10.61.4.150) agar bisa diakses dari device fisik maupun emulator
+const DEV_BASE_URL = Platform.select({
+    android: 'http://192.168.1.4/project_lavirameal/api/',
+    ios: 'http://192.168.1.4/project_lavirameal/api/',
+    default: 'http://192.168.1.4/project_lavirameal/api/',
+});
+// NOTE: Pastikan laptop dan HP berada dalam jaringan WiFi yang sama jika menggunakan device fisik.
+
+
+
+
+// NOTE: User perlu menyesuaikan URL ini sesuai setup server PHP mereka
+// IP yang digunakan saat ini: 10.61.4.150
+
+export const API_URL = DEV_BASE_URL;
+export const IMAGE_BASE_URL = DEV_BASE_URL.replace('api/', '');
+
+const apiClient = axios.create({
+    baseURL: API_URL,
+    timeout: 30000, // Meningkatkan timeout menjadi 30 detik untuk kelancaran upload foto besar
+});
+
+// Tambahkan interceptor untuk debugging
+apiClient.interceptors.request.use(request => {
+    console.log('Starting Request', JSON.stringify(request.url, null, 2));
+    return request;
+});
+
+apiClient.interceptors.response.use(
+    response => response,
+    error => {
+        console.log('API Error:', error.response?.status, error.config?.url);
+        return Promise.reject(error);
+    }
+);
+
+export default apiClient;
