@@ -55,6 +55,7 @@ export default function HomeScreenSekolah({ navigation }) {
   const [kantinModalVisible, setKantinModalVisible] = useState(false);
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [calendarModalVisible, setCalendarModalVisible] = useState(false);
+  const [breakdownModalVisible, setBreakdownModalVisible] = useState(false);
   const [deletingKantinId, setDeletingKantinId] = useState(null);
   const [calendarDate, setCalendarDate] = useState(new Date());
 
@@ -353,13 +354,17 @@ export default function HomeScreenSekolah({ navigation }) {
              )}
              
              <View style={styles.pieBody}>
-                {/* Concentric Donut representation */}
-                <View style={[styles.donutOuter, { borderColor: takingPercent >= 70 ? '#10B981' : '#4F46E5' }]}>
-                   <View style={styles.donutInner}>
-                      <Text style={styles.donutPercentText}>{takingPercent}%</Text>
-                      <Text style={styles.donutLabelText}>Mengambil</Text>
-                   </View>
-                </View>
+                 {/* Concentric Donut representation */}
+                 <TouchableOpacity 
+                    style={[styles.donutOuter, { borderColor: takingPercent >= 70 ? '#10B981' : '#4F46E5' }]}
+                    onPress={() => setBreakdownModalVisible(true)}
+                 >
+                    <View style={styles.donutInner}>
+                       <Text style={styles.donutPercentText}>{takingPercent}%</Text>
+                       <Text style={styles.donutLabelText}>Mengambil</Text>
+                       <Text style={{ fontSize: 8, color: '#4F46E5', fontWeight: 'bold', marginTop: 3 }}>Tap Detail</Text>
+                    </View>
+                 </TouchableOpacity>
 
                 {/* Progress Indicators & Detailed Legend */}
                 <View style={styles.pieDetails}>
@@ -443,10 +448,24 @@ export default function HomeScreenSekolah({ navigation }) {
                       <View style={[styles.mIcon, { backgroundColor: '#F0FDF4', marginRight: 15 }]}>
                          <Ionicons name="storefront" size={20} color={SUCCESS} />
                       </View>
-                      <View style={{ flex: 1 }}>
+                      <TouchableOpacity 
+                        style={{ flex: 1 }}
+                        onPress={() => {
+                          setKantinModalVisible(false);
+                          navigation.navigate('CanteenFeedback', {
+                            kantin_id: k.id,
+                            nama_kantin: k.nama_kantin,
+                            foto_kantin: k.foto_kantin
+                          });
+                        }}
+                      >
                         <Text style={{ fontSize: 15, fontWeight: 'bold', color: BLUE_DARK }}>{k.nama_kantin}</Text>
                         <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2, fontWeight: '600' }}>PIC: {k.penanggung_jawab}</Text>
-                      </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 }}>
+                          <Ionicons name="star" size={11} color={GOLD} />
+                          <Text style={{ fontSize: 10, color: GOLD, fontWeight: '800' }}>Lihat Ulasan & Rating</Text>
+                        </View>
+                      </TouchableOpacity>
                       <View style={{ alignItems: 'flex-end', gap: 6 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: k.is_aktif ? '#DCFCE7' : '#FEE2E2', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
                           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: k.is_aktif ? SUCCESS : DANGER }} />
@@ -564,6 +583,56 @@ export default function HomeScreenSekolah({ navigation }) {
                 <Text style={styles.calendarCloseBtnText}>Tutup</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* DETAILED BREAKDOWN MODAL PER KELAS */}
+      <Modal visible={breakdownModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.kantinModalSheet}>
+            <View style={styles.sheetHeader}>
+              <View>
+                <Text style={styles.sheetTitle}>Partisipasi Per Kelas</Text>
+                <Text style={styles.sheetSubtitle}>
+                  {selectedTanggal === '' ? 'Hari Ini' : new Date(selectedTanggal).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setBreakdownModalVisible(false)} style={styles.closeBtn}>
+                <Ionicons name="close" size={24} color={BLUE_DARK} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
+              {stats.pie_chart && stats.pie_chart.kelas_breakdown && stats.pie_chart.kelas_breakdown.length > 0 ? (
+                <View style={{ gap: 12, paddingBottom: 20 }}>
+                  {stats.pie_chart.kelas_breakdown.map((item, idx) => (
+                    <View key={idx} style={[styles.kantinListItem, { paddingVertical: 12 }]}>
+                      <View style={[styles.mIcon, { backgroundColor: item.presentase >= 70 ? '#F0FDF4' : '#EEF2FF', marginRight: 15 }]}>
+                         <Ionicons name="school" size={20} color={item.presentase >= 70 ? SUCCESS : '#4F46E5'} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 15, fontWeight: 'bold', color: BLUE_DARK }}>Kelas {item.kelas}</Text>
+                        <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2, fontWeight: '600' }}>
+                          Scan: {item.sudah_scan} / {item.total_siswa} Siswa
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 16, fontWeight: '900', color: item.presentase >= 70 ? SUCCESS : '#4F46E5' }}>
+                          {item.presentase}%
+                        </Text>
+                        <Text style={{ fontSize: 8, color: '#94A3B8', fontWeight: 'bold' }}>Partisipasi</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                  <Ionicons name="school-outline" size={48} color="#CBD5E1" />
+                  <Text style={{ fontSize: 14, color: '#94A3B8', marginTop: 10, fontWeight: '600' }}>Belum ada data kelas</Text>
+                </View>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>

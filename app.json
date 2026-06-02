@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "lavira",
+    "name": "LaviraMeal",
     "slug": "lavira",
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
@@ -16,10 +16,16 @@
       "supportsTablet": true
     },
     "android": {
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.rhmalyy.lavira"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -32,6 +38,11 @@
         }
       ],
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ea97ccfa-e069-4902-8183-a98da97685ff"
+      }
+    }
   }
 }

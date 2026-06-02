@@ -18,7 +18,7 @@ if ($method == 'POST') {
 
     try {
         // Handle Upload Foto Menu
-        $target_dir = "../../uploads/menu_harian/";
+        $target_dir = __DIR__ . "/../../uploads/menu_harian/";
         if (!file_exists($target_dir)) mkdir($target_dir, 0777, true);
 
         $foto_menu_path = null;

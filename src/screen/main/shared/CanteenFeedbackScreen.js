@@ -184,10 +184,10 @@ export default function CanteenFeedbackScreen({ route, navigation }) {
               {item.photo && (
                 <TouchableOpacity
                   style={styles.reviewPhotoContainer}
-                  onPress={() => setSelectedPhoto(`${IMAGE_BASE_URL}${item.photo}`)}
+                  onPress={() => setSelectedPhoto(`${IMAGE_BASE_URL}uploads/${item.photo}`)}
                 >
                   <Image
-                    source={{ uri: `${IMAGE_BASE_URL}${item.photo}` }}
+                    source={{ uri: `${IMAGE_BASE_URL}uploads/${item.photo}` }}
                     style={styles.reviewPhoto}
                     resizeMode="cover"
                   />

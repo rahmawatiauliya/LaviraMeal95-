@@ -1,4 +1,8 @@
+
 <?php
+// Izinkan akses dari aplikasi mobile
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Headers: Content-Type");
 header("Content-Type: application/json");
 include_once __DIR__ . '/../shared/config.php';
 
@@ -6,6 +10,8 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method == 'POST') {
     $data = json_decode(file_get_contents("php://input"));
+    // Debug: log data yang diterima
+    // file_put_contents(__DIR__.'/login_debug.log', json_encode($data)."\n", FILE_APPEND);
 
     $idnt = !empty($data->email) ? $data->email : (!empty($data->identifier) ? $data->identifier : null);
 

@@ -34,6 +34,7 @@ const ACCENT = '#38BDF8';
 export default function HomeScreenKantin({ navigation }) {
   const { width } = useWindowDimensions();
   const [userData, setUserData] = useState(null);
+  const [profileImage, setProfileImage] = useState(null);
   const [stats, setStats] = useState({
     total_pendapatan: 0,
     total_saldo: 0,
@@ -58,7 +59,7 @@ export default function HomeScreenKantin({ navigation }) {
     try {
       let hasPermission = false;
       let MediaLibrary = null;
-      
+
       // Minta izin galeri menggunakan expo-media-library
       try {
         MediaLibrary = require('expo-media-library');
@@ -68,7 +69,7 @@ export default function HomeScreenKantin({ navigation }) {
             hasPermission = true;
           } else {
             Alert.alert(
-              'Izin Ditolak', 
+              'Izin Ditolak',
               'Maaf, diperlukan izin akses galeri untuk menyimpan gambar secara langsung.'
             );
             return;
@@ -111,7 +112,7 @@ export default function HomeScreenKantin({ navigation }) {
 
   useEffect(() => {
     loadUserData();
-    
+
     // Real-time polling every 10 seconds
     const interval = setInterval(() => {
       if (userData?.id) {
@@ -126,6 +127,7 @@ export default function HomeScreenKantin({ navigation }) {
   useFocusEffect(
     React.useCallback(() => {
       if (userData?.id) {
+        AsyncStorage.getItem(`@profile_image_kantin_${userData.id}`).then(img => setProfileImage(img));
         fetchKantinStats(userData.id);
       }
     }, [userData?.id])
@@ -149,7 +151,7 @@ export default function HomeScreenKantin({ navigation }) {
   const fetchKantinStats = async (kantinId) => {
     try {
       const response = await apiClient.get(`kantin/get_dashboard_stats.php?user_id=${kantinId}`);
-      
+
       if (response.data.status === 'success') {
         setStats({
           total_pendapatan: response.data.data.total_pendapatan,
@@ -176,8 +178,8 @@ export default function HomeScreenKantin({ navigation }) {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
-      <ScrollView 
+
+      <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[BLUE_PRIMARY]} />}
       >
@@ -190,8 +192,12 @@ export default function HomeScreenKantin({ navigation }) {
           <SafeAreaView>
             <View style={styles.headerTop}>
               <View style={styles.userInfo}>
-                <View style={styles.avatarContainer}>
-                  <Text style={styles.avatarText}>{userData?.nama?.charAt(0) || 'K'}</Text>
+                <View style={[styles.avatarContainer, { overflow: 'hidden' }]}>
+                  {profileImage ? (
+                    <Image source={{ uri: profileImage }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+                  ) : (
+                    <Text style={styles.avatarText}>{userData?.nama?.charAt(0) || 'K'}</Text>
+                  )}
                 </View>
                 <View>
                   <Text style={styles.welcomeText}>DASHBOARD KANTIN,</Text>
@@ -208,52 +214,52 @@ export default function HomeScreenKantin({ navigation }) {
         </View>
 
         <View style={styles.contentBody}>
-            {/* EARNINGS CARD */}
-            <View style={styles.walletCard}>
-              <View style={{ borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 15, marginBottom: 15 }}>
-                <Text style={styles.walletLabel}>Total Saldo Poin (Semua Hari)</Text>
-                <Text style={[styles.walletValue, { fontSize: 28, color: BLUE_PRIMARY }]}>
-                  {Number(stats.total_saldo || 0).toLocaleString('id-ID')} PTS
+          {/* EARNINGS CARD */}
+          <View style={styles.walletCard}>
+            <View style={{ borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 15, marginBottom: 15 }}>
+              <Text style={styles.walletLabel}>Total Saldo Poin (Semua Hari)</Text>
+              <Text style={[styles.walletValue, { fontSize: 28, color: BLUE_PRIMARY }]}>
+                {Number(stats.total_saldo || 0).toLocaleString('id-ID')} PTS
+              </Text>
+              <Text style={styles.pointNoteMini}>Total Estimasi: {formatIDR(stats.total_saldo)}</Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View>
+                <Text style={[styles.walletLabel, { fontSize: 9 }]}>Pendapatan Hari Ini</Text>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: BLUE_DARK, marginTop: 2 }}>
+                  {Number(stats.total_pendapatan || 0).toLocaleString('id-ID')} PTS
                 </Text>
-                <Text style={styles.pointNoteMini}>Total Estimasi: {formatIDR(stats.total_saldo)}</Text>
               </View>
 
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View>
-                  <Text style={[styles.walletLabel, { fontSize: 9 }]}>Pendapatan Hari Ini</Text>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: BLUE_DARK, marginTop: 2 }}>
-                    {Number(stats.total_pendapatan || 0).toLocaleString('id-ID')} PTS
-                  </Text>
-                </View>
+              <View style={{ width: 1, height: 25, backgroundColor: '#E2E8F0' }} />
 
-                <View style={{ width: 1, height: 25, backgroundColor: '#E2E8F0' }} />
-
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[styles.walletLabel, { fontSize: 9 }]}>Transaksi Hari Ini</Text>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: SUCCESS, marginTop: 2 }}>
-                    {stats.transaksi_hari_ini} SCAN
-                  </Text>
-                </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={[styles.walletLabel, { fontSize: 9 }]}>Transaksi Hari Ini</Text>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: SUCCESS, marginTop: 2 }}>
+                  {stats.transaksi_hari_ini} SCAN
+                </Text>
               </View>
             </View>
+          </View>
           {/* QUICK ACTIONS */}
           <View style={styles.actionGrid}>
-             <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('ScannerKantin')}>
-                <View style={[styles.actionIcon, { backgroundColor: '#F0FDF4' }]}><Ionicons name="scan" size={22} color={SUCCESS} /></View>
-                <Text style={styles.actionLabel}>Scan Siswa</Text>
-             </TouchableOpacity>
-             <TouchableOpacity style={styles.actionItem} onPress={() => setShowQRModal(true)}>
-                <View style={[styles.actionIcon, { backgroundColor: '#FFFBEB' }]}><Ionicons name="qr-code" size={22} color={GOLD} /></View>
-                <Text style={styles.actionLabel}>QR Kantin</Text>
-             </TouchableOpacity>
-             <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('PostMenuHarian')}>
-                <View style={[styles.actionIcon, { backgroundColor: '#EFF6FF' }]}><Ionicons name="fast-food" size={22} color={ACCENT} /></View>
-                <Text style={styles.actionLabel}>Post Menu</Text>
-             </TouchableOpacity>
-             <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('LaporanKantin')}>
-                <View style={[styles.actionIcon, { backgroundColor: '#FDF2F8' }]}><Ionicons name="stats-chart" size={22} color="#D946EF" /></View>
-                <Text style={styles.actionLabel}>Laporan</Text>
-             </TouchableOpacity>
+            <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('ScannerKantin')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#F0FDF4' }]}><Ionicons name="scan" size={22} color={SUCCESS} /></View>
+              <Text style={styles.actionLabel}>Scan Siswa</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionItem} onPress={() => setShowQRModal(true)}>
+              <View style={[styles.actionIcon, { backgroundColor: '#FFFBEB' }]}><Ionicons name="qr-code" size={22} color={GOLD} /></View>
+              <Text style={styles.actionLabel}>QR Kantin</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('PostMenuHarian')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#EFF6FF' }]}><Ionicons name="fast-food" size={22} color={ACCENT} /></View>
+              <Text style={styles.actionLabel}>Post Menu</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('LaporanKantin')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#FDF2F8' }]}><Ionicons name="stats-chart" size={22} color="#D946EF" /></View>
+              <Text style={styles.actionLabel}>Laporan</Text>
+            </TouchableOpacity>
           </View>
 
           {/* RECENT ACTIVITY */}
@@ -265,88 +271,90 @@ export default function HomeScreenKantin({ navigation }) {
           </View>
 
           {stats.riwayat.length > 0 ? stats.riwayat.slice(0, 2).map((item, idx) => (
-             <View key={idx} style={styles.activityCard}>
-                <View style={styles.activityIcon}><Ionicons name="person-circle-outline" size={20} color={BLUE_PRIMARY} /></View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                   <Text style={styles.activityName}>{item.message}</Text>
-                   <Text style={styles.activityTime}>{item.created_at ? new Date(item.created_at).toLocaleString('id-ID') : '-'}</Text>
-                </View>
-                <Text style={[styles.activityAmount, { color: SUCCESS }]}>
-                  +{item.amount} PTS
-                </Text>
-             </View>
+            <View key={idx} style={styles.activityCard}>
+              <View style={styles.activityIcon}><Ionicons name="person-circle-outline" size={20} color={BLUE_PRIMARY} /></View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.activityName}>{item.message}</Text>
+                <Text style={styles.activityTime}>{item.created_at ? new Date(item.created_at).toLocaleString('id-ID') : '-'}</Text>
+              </View>
+              <Text style={[styles.activityAmount, { color: SUCCESS }]}>
+                +{item.amount} PTS
+              </Text>
+            </View>
           )) : (
             <View style={styles.emptyActivity}>
-               <Text style={styles.emptyText}>Belum ada transaksi hari ini</Text>
+              <Text style={styles.emptyText}>Belum ada transaksi hari ini</Text>
             </View>
           )}
 
           {/* FEEDBACK SECTION */}
           <View style={[styles.activityHeader, { marginTop: 25 }]}>
             <Text style={styles.sectionTitle}>Ulasan Siswa</Text>
-            <TouchableOpacity><Text style={styles.viewAll}>Lihat Semua</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('CanteenFeedback', { kantin_id: userData?.id, nama_kantin: userData?.nama })}>
+              <Text style={styles.viewAll}>Lihat Semua</Text>
+            </TouchableOpacity>
           </View>
 
-          {stats.notifikasi && stats.notifikasi.length > 0 ? stats.notifikasi.map((notif, idx) => {
-             const photoUrl = notif.photo ? `${API_URL.replace(/\/api\/?$/, '')}/uploads/${notif.photo}` : null;
-             return (
-               <View key={idx} style={styles.feedbackCard}>
-                  <View style={styles.feedbackHeader}>
-                     <Text style={styles.feedbackUser}>{notif.user}</Text>
-                     <View style={styles.starsRow}>
-                        {[1,2,3,4,5].map(s => (
-                          <Ionicons key={s} name="star" size={10} color={s <= notif.rating ? GOLD : '#E2E8F0'} style={{ marginRight: 2 }} />
-                        ))}
-                     </View>
+          {stats.notifikasi && stats.notifikasi.length > 0 ? stats.notifikasi.slice(0, 1).map((notif, idx) => {
+            const photoUrl = notif.photo ? `${API_URL.replace(/\/api\/?$/, '')}/uploads/${notif.photo}` : null;
+            return (
+              <View key={idx} style={styles.feedbackCard}>
+                <View style={styles.feedbackHeader}>
+                  <Text style={styles.feedbackUser}>{notif.user}</Text>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map(s => (
+                      <Ionicons key={s} name="star" size={10} color={s <= notif.rating ? GOLD : '#E2E8F0'} style={{ marginRight: 2 }} />
+                    ))}
                   </View>
-                  <Text style={styles.feedbackComment}>{notif.comment}</Text>
-                  
-                  {photoUrl && (
-                     <View style={{ marginTop: 12 }}>
-                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#64748B', marginBottom: 6 }}>
-                           Foto Makanan:
-                        </Text>
-                        <TouchableOpacity 
-                           activeOpacity={0.8}
-                           onPress={() => {
-                             setSelectedPhoto(photoUrl);
-                             setShowPhotoModal(true);
-                           }}
-                        >
-                           <Image 
-                              source={{ uri: photoUrl }} 
-                              style={{ 
-                                 width: '100%', 
-                                 height: 150, 
-                                 borderRadius: 12, 
-                                 backgroundColor: '#F1F5F9',
-                                 resizeMode: 'cover'
-                              }} 
-                           />
-                           <View style={{ 
-                              position: 'absolute', 
-                              bottom: 8, 
-                              right: 8, 
-                              backgroundColor: 'rgba(15, 23, 42, 0.75)', 
-                              paddingHorizontal: 10, 
-                              paddingVertical: 4, 
-                              borderRadius: 8,
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 4
-                           }}>
-                              <Ionicons name="expand" size={12} color="#FFF" />
-                              <Text style={{ color: '#FFF', fontSize: 10, fontWeight: 'bold' }}>Perbesar</Text>
-                           </View>
-                        </TouchableOpacity>
-                     </View>
-                  )}
-               </View>
-             );
+                </View>
+                <Text style={styles.feedbackComment}>{notif.comment}</Text>
+
+                {photoUrl && (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#64748B', marginBottom: 6 }}>
+                      Foto Makanan:
+                    </Text>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        setSelectedPhoto(photoUrl);
+                        setShowPhotoModal(true);
+                      }}
+                    >
+                      <Image
+                        source={{ uri: photoUrl }}
+                        style={{
+                          width: '100%',
+                          height: 150,
+                          borderRadius: 12,
+                          backgroundColor: '#F1F5F9',
+                          resizeMode: 'cover'
+                        }}
+                      />
+                      <View style={{
+                        position: 'absolute',
+                        bottom: 8,
+                        right: 8,
+                        backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                        borderRadius: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4
+                      }}>
+                        <Ionicons name="expand" size={12} color="#FFF" />
+                        <Text style={{ color: '#FFF', fontSize: 10, fontWeight: 'bold' }}>Perbesar</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            );
           }) : (
-             <View style={styles.emptyActivity}>
-                <Text style={styles.emptyText}>Belum ada ulasan siswa saat ini</Text>
-             </View>
+            <View style={styles.emptyActivity}>
+              <Text style={styles.emptyText}>Belum ada ulasan siswa saat ini</Text>
+            </View>
           )}
 
         </View>
@@ -356,20 +364,20 @@ export default function HomeScreenKantin({ navigation }) {
 
       {/* BOTTOM NAV */}
       <View style={styles.bottomNav}>
-         <TouchableOpacity style={styles.navItem}>
-           <Ionicons name="grid" size={24} color={BLUE_PRIMARY} />
-           <Text style={[styles.navLabel, {color: BLUE_PRIMARY}]}>Beranda</Text>
-         </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem}>
+          <Ionicons name="grid" size={24} color={BLUE_PRIMARY} />
+          <Text style={[styles.navLabel, { color: BLUE_PRIMARY }]}>Beranda</Text>
+        </TouchableOpacity>
 
-         <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('LaporanKantin')}>
-           <Ionicons name="stats-chart-outline" size={24} color="#94A3B8" />
-           <Text style={styles.navLabel}>Laporan</Text>
-         </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('LaporanKantin')}>
+          <Ionicons name="stats-chart-outline" size={24} color="#94A3B8" />
+          <Text style={styles.navLabel}>Laporan</Text>
+        </TouchableOpacity>
 
-         <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('ProfilKantin')}>
-           <Ionicons name="person-outline" size={24} color="#94A3B8" />
-           <Text style={styles.navLabel}>Profil</Text>
-         </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('ProfilKantin')}>
+          <Ionicons name="person-outline" size={24} color="#94A3B8" />
+          <Text style={styles.navLabel}>Profil</Text>
+        </TouchableOpacity>
       </View>
 
       {/* QR MODAL */}
@@ -377,7 +385,7 @@ export default function HomeScreenKantin({ navigation }) {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { position: 'relative', overflow: 'hidden' }]}>
             {/* Absolute close button outside the ViewShot card */}
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setShowQRModal(false)}
               style={{
                 position: 'absolute',
@@ -397,8 +405,8 @@ export default function HomeScreenKantin({ navigation }) {
 
             <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ backgroundColor: '#FFFFFF', alignItems: 'center', width: '100%', padding: 5 }}>
               <View style={{ flexDirection: 'row', width: '100%', alignItems: 'center', marginBottom: 15, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 12 }}>
-                <Image 
-                  source={require('../../../../assets/LOGO_LAVIRAMEAL_TRANSPARENT.png')} 
+                <Image
+                  source={require('../../../../assets/LOGO_LAVIRAMEAL_CLEAN.png')}
                   style={{ width: 36, height: 36, marginRight: 10 }}
                 />
                 <View>
@@ -407,50 +415,50 @@ export default function HomeScreenKantin({ navigation }) {
                 </View>
               </View>
 
-            <View style={styles.qrModalContent}>
-              <Text style={styles.qrNote}>Tunjukkan QR ini jika siswa ingin melakukan scan manual ke kantin Anda.</Text>
-              
-              <View style={styles.qrWrapperModal}>
-                <View style={styles.qrBgModal}>
-                  <QRCode 
-                    value={userData?.username || 'KANTIN-LAVIRA'} 
-                    size={200} 
-                    color={BLUE_PRIMARY} 
-                    getRef={(c) => { svgRef.current = c; }}
-                  />
+              <View style={styles.qrModalContent}>
+                <Text style={styles.qrNote}>Tunjukkan QR ini jika siswa ingin melakukan scan manual ke kantin Anda.</Text>
+
+                <View style={styles.qrWrapperModal}>
+                  <View style={styles.qrBgModal}>
+                    <QRCode
+                      value={userData?.username || 'KANTIN-LAVIRA'}
+                      size={200}
+                      color={BLUE_PRIMARY}
+                      getRef={(c) => { svgRef.current = c; }}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.studentInfoBox}>
+                  <Text style={styles.infoName}>{userData?.nama}</Text>
+                  <Text style={styles.infoNis}>KODE: {userData?.username}</Text>
                 </View>
               </View>
+            </ViewShot>
 
-              <View style={styles.studentInfoBox}>
-                <Text style={styles.infoName}>{userData?.nama}</Text>
-                <Text style={styles.infoNis}>KODE: {userData?.username}</Text>
-              </View>
-            </View>
-          </ViewShot>
+            <TouchableOpacity
+              style={{
+                backgroundColor: SUCCESS,
+                width: '100%',
+                height: 55,
+                borderRadius: 18,
+                justifyContent: 'center',
+                alignItems: 'center',
+                flexDirection: 'row',
+                gap: 8,
+                marginTop: 15,
+                marginBottom: 12
+              }}
+              onPress={handleDownloadQR}
+            >
+              <Ionicons name="download-outline" size={20} color="#FFF" />
+              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: 'bold' }}>Simpan QR ke Galeri</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={{ 
-              backgroundColor: SUCCESS, 
-              width: '100%', 
-              height: 55, 
-              borderRadius: 18, 
-              justifyContent: 'center', 
-              alignItems: 'center', 
-              flexDirection: 'row',
-              gap: 8,
-              marginTop: 15,
-              marginBottom: 12 
-            }} 
-            onPress={handleDownloadQR}
-          >
-            <Ionicons name="download-outline" size={20} color="#FFF" />
-            <Text style={{ color: '#FFF', fontSize: 16, fontWeight: 'bold' }}>Simpan QR ke Galeri</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.closeBtn} onPress={() => setShowQRModal(false)}>
-            <Text style={styles.closeBtnText}>Tutup</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity style={styles.closeBtn} onPress={() => setShowQRModal(false)}>
+              <Text style={styles.closeBtnText}>Tutup</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
 
@@ -466,23 +474,23 @@ export default function HomeScreenKantin({ navigation }) {
             </View>
 
             {selectedPhoto ? (
-              <Image 
-                source={{ uri: selectedPhoto }} 
-                style={{ 
-                  width: '100%', 
-                  height: 350, 
-                  borderRadius: 16, 
+              <Image
+                source={{ uri: selectedPhoto }}
+                style={{
+                  width: '100%',
+                  height: 350,
+                  borderRadius: 16,
                   marginTop: 15,
                   backgroundColor: '#F8FAFC',
                   resizeMode: 'contain'
-                }} 
+                }}
               />
             ) : (
               <ActivityIndicator color={BLUE_PRIMARY} style={{ marginVertical: 30 }} />
             )}
 
-            <TouchableOpacity 
-              style={[styles.closeBtn, { marginTop: 20 }]} 
+            <TouchableOpacity
+              style={[styles.closeBtn, { marginTop: 20 }]}
               onPress={() => setShowPhotoModal(false)}
             >
               <Text style={styles.closeBtnText}>Tutup</Text>
@@ -504,7 +512,7 @@ const styles = StyleSheet.create({
   welcomeText: { fontSize: 10, color: 'rgba(255,255,255,0.6)', fontWeight: '800', letterSpacing: 1 },
   userName: { fontSize: 18, fontWeight: 'bold', color: WHITE },
   schoolName: { fontSize: 11, color: GOLD, fontWeight: '700', marginTop: 2 },
-  
+
   walletCard: { backgroundColor: WHITE, borderRadius: 28, padding: 22, elevation: 15, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 15, marginBottom: 30 },
   walletInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   walletLabel: { fontSize: 11, color: '#94A3B8', fontWeight: '800', textTransform: 'uppercase' },
@@ -516,7 +524,7 @@ const styles = StyleSheet.create({
 
   contentBody: { paddingHorizontal: 25, marginTop: -30 },
   sectionTitle: { fontSize: 16, fontWeight: '900', color: BLUE_DARK },
-  
+
   actionGrid: { flexDirection: 'row', justifyContent: 'center', marginBottom: 35, gap: 20 },
   actionItem: { alignItems: 'center', width: 80 },
   actionIcon: { width: 56, height: 56, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 10, elevation: 2 },

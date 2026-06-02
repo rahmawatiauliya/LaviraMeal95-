@@ -17,9 +17,9 @@ const { width, height } = Dimensions.get('window');
 
 const BLUE_PRIMARY = '#0A1931';
 const BLUE_DARK = '#000C24';
-const GOLD = '#E2B13C';
+const LIGHT_BLUE = '#38BDF8';
 const WHITE = '#FFFFFF';
-const ACCENT = '#38BDF8';
+const ACCENT = '#0EA5E9';
 
 export default function LandingScreen({ navigation }) {
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -57,14 +57,14 @@ export default function LandingScreen({ navigation }) {
           
           {/* HEADER / LOGO */}
           <Animated.View style={[styles.headerSection, { opacity: fadeAnim }]}>
-            <View style={styles.logoBadge}>
-               <Image 
-                 source={require('../../../assets/LOGO_LAVIRAMEAL_TRANSPARENT.png')} 
-                 style={{ width: 36, height: 36, resizeMode: 'contain' }} 
-               />
-            </View>
+             <View style={styles.logoBadge}>
+                <Image 
+                  source={require('../../../assets/Lavira_CLEAN.png')} 
+                  style={{ width: 44, height: 44, resizeMode: 'contain' }} 
+                />
+             </View>
             <Text style={styles.brandTitle}>
-              LAVIRA<Text style={{ color: GOLD }}>MEAL</Text>
+              LAVIRA<Text style={{ color: LIGHT_BLUE }}>MEAL</Text>
             </Text>
             <Text style={styles.brandSubtitle}>Makan Sehat · Anak Bangsa Hebat</Text>
           </Animated.View>
@@ -72,24 +72,22 @@ export default function LandingScreen({ navigation }) {
           {/* MAIN CONTENT CENTER */}
           <Animated.View style={[styles.centerSection, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
             <View style={styles.iconShowcase}>
-               {/* Ambient Glow behind the logo */}
-               <View style={styles.ambientGlow} />
                <Image 
-                 source={require('../../../assets/LOGO_LAVIRAMEAL_TRANSPARENT.png')} 
+                 source={require('../../../assets/Lavira_CLEAN.png')} 
                  style={styles.heroLogo} 
                />
                {/* Floating elements */}
                <View style={[styles.floatBadge, { top: -5, right: -5 }]}>
                   <Feather name="shield" size={14} color={WHITE} />
                </View>
-               <View style={[styles.floatBadge, { bottom: -5, left: -5, backgroundColor: GOLD }]}>
+               <View style={[styles.floatBadge, { bottom: -5, left: -5, backgroundColor: LIGHT_BLUE }]}>
                   <Ionicons name="star" size={14} color={BLUE_DARK} />
                </View>
             </View>
 
             <Text style={styles.heroText}>
               Gizi Terbaik Untuk{"\n"}
-              <Text style={{ color: GOLD }}>Generasi Bangsa</Text>
+              <Text style={{ color: LIGHT_BLUE }}>Generasi Bangsa</Text>
             </Text>
             
             <Text style={styles.descText}>
@@ -163,12 +161,12 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(226, 177, 60, 0.12)',
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
     borderWidth: 1.5,
-    borderColor: 'rgba(226, 177, 60, 0.35)',
+    borderColor: 'rgba(56, 189, 248, 0.35)',
   },
   brandTitle: {
     fontSize: 28,
@@ -178,7 +176,7 @@ const styles = StyleSheet.create({
   },
   brandSubtitle: {
     fontSize: 12,
-    color: GOLD,
+    color: LIGHT_BLUE,
     fontWeight: '600',
     letterSpacing: 2,
     marginTop: 4,
@@ -189,8 +187,8 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   iconShowcase: {
-    width: 180,
-    height: 180,
+    width: 200,
+    height: 200,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 35,
@@ -209,8 +207,8 @@ const styles = StyleSheet.create({
     elevation: 15,
   },
   heroLogo: {
-    width: 150,
-    height: 150,
+    width: 200,
+    height: 200,
     resizeMode: 'contain',
   },
   floatBadge: {
@@ -262,14 +260,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   mainButton: {
-    backgroundColor: GOLD,
+    backgroundColor: LIGHT_BLUE,
     width: '100%',
     height: 56,
     borderRadius: 16,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: GOLD,
+    shadowColor: LIGHT_BLUE,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 12,

@@ -32,8 +32,8 @@ try {
         $db->exec("ALTER TABLE scheduled_points ADD CONSTRAINT unique_sekolah UNIQUE (sekolah_id)");
     } catch (Exception $e) { }
 
-    $query = "INSERT INTO scheduled_points (sekolah_id, monthly_amount, distribution_day) 
-              VALUES (:sid, :amt, :day) 
+    $query = "INSERT INTO scheduled_points (sekolah_id, monthly_amount, distribution_day, last_distributed) 
+              VALUES (:sid, :amt, :day, NULL) 
               ON DUPLICATE KEY UPDATE monthly_amount = :amt2, distribution_day = :day2";
               
     $stmt = $db->prepare($query);

@@ -107,19 +107,24 @@ if (!empty($sppg_id)) {
                         $guru_id = bin2hex(random_bytes(16));
                         $password_hash = password_hash('guru123', PASSWORD_BCRYPT);
                         
+                        // Make NIP and email unique for this school to avoid duplicate constraint errors
+                        $school_suffix = substr($sekolah['id'], 0, 6);
+                        $unique_nip = $mg['nip'] . "_" . $school_suffix;
+                        $unique_email = str_replace('@', '_' . $school_suffix . '@', $mg['email']);
+                        
                         // Insert User
                         $stmt_u = $db->prepare("
                             INSERT INTO users (id, nama, username, email, password_hash, role, sekolah_id, is_active)
                             VALUES (?, ?, ?, ?, ?, 'guru', ?, 1)
                         ");
-                        $stmt_u->execute([$user_id, $mg['nama'], $mg['nip'], $mg['email'], $password_hash, $sekolah['id']]);
+                        $stmt_u->execute([$user_id, $mg['nama'], $unique_nip, $unique_email, $password_hash, $sekolah['id']]);
                         
                         // Insert Guru
                         $stmt_g = $db->prepare("
                             INSERT INTO guru (id, user_id, sekolah_id, nip, nama, mata_pelajaran)
                             VALUES (?, ?, ?, ?, ?, ?)
                         ");
-                        $stmt_g->execute([$guru_id, $user_id, $sekolah['id'], $mg['nip'], $mg['nama'], $mg['mapel']]);
+                        $stmt_g->execute([$guru_id, $user_id, $sekolah['id'], $unique_nip, $mg['nama'], $mg['mapel']]);
                     }
                 }
 

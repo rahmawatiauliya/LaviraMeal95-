@@ -68,7 +68,7 @@ try {
         $db->prepare($updateSekolah)->execute([$amount, $sekolahId]);
 
         // 3. Catat transaksi
-        $trx_id = 'AUTO-PTS-' . date('Ymd') . '-' . substr(md5($sekolahId), 0, 4);
+        $trx_id = 'AUTO-PTS-' . date('Ymd') . '-' . bin2hex(random_bytes(3));
         $insertTrx = "INSERT INTO transaksi_dana (id, sppg_id, sekolah_id, nominal, metode, status) 
                       VALUES (?, (SELECT id FROM sppg LIMIT 1), ?, ?, 'Auto-Monthly', 'Berhasil')";
         $db->prepare($insertTrx)->execute([$trx_id, $sekolahId, $amount]);

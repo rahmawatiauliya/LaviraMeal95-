@@ -27,49 +27,64 @@ try {
 
     $kantin_id = $kantin['id'];
 
-    // 1.5 Ambil Total Saldo Poin Akumulatif
-    $stmtSaldo = $db->prepare("SELECT COALESCE(saldo, 0) as total_saldo FROM kantin WHERE id = ?");
-    $stmtSaldo->execute([$kantin_id]);
+    // 1.5 Ambil Total Saldo Poin Akumulatif dari gabungan
+    $stmtSaldo = $db->prepare("
+        SELECT COALESCE(SUM(nominal), 0) as total_saldo FROM (
+            SELECT nominal FROM transaksi_siswa WHERE kantin_id = ? AND type = 'keluar'
+            UNION ALL
+            SELECT nominal FROM transaksi_guru WHERE kantin_id = ? AND type = 'keluar'
+        ) combined
+    ");
+    $stmtSaldo->execute([$kantin_id, $kantin_id]);
     $saldoRow = $stmtSaldo->fetch(PDO::FETCH_ASSOC);
     $total_saldo = $saldoRow ? $saldoRow['total_saldo'] : 0;
 
-    // 2. Hitung Pendapatan Hari Ini (dari transaksi_siswa)
-    // Asumsi transaksi_siswa memiliki kolom kantin_id
+    // 2. Hitung Pendapatan Hari Ini
     $stmtEarning = $db->prepare("
-        SELECT COALESCE(SUM(nominal), 0) as total 
-        FROM transaksi_siswa 
-        WHERE kantin_id = ? AND DATE(created_at) = CURDATE() AND type = 'keluar'
+        SELECT COALESCE(SUM(nominal), 0) as total FROM (
+            SELECT nominal FROM transaksi_siswa WHERE kantin_id = ? AND DATE(created_at) = CURDATE() AND type = 'keluar'
+            UNION ALL
+            SELECT nominal FROM transaksi_guru WHERE kantin_id = ? AND DATE(created_at) = CURDATE() AND type = 'keluar'
+        ) combined
     ");
-    // Catatan: type 'keluar' bagi siswa adalah 'masuk' bagi kantin
-    $stmtEarning->execute([$kantin_id]);
+    $stmtEarning->execute([$kantin_id, $kantin_id]);
     $earning = $stmtEarning->fetch(PDO::FETCH_ASSOC);
 
     // 3. Hitung Jumlah Transaksi Hari Ini
     $stmtCount = $db->prepare("
-        SELECT COUNT(*) as total 
-        FROM transaksi_siswa 
-        WHERE kantin_id = ? AND DATE(created_at) = CURDATE() AND type = 'keluar'
+        SELECT COUNT(*) as total FROM (
+            SELECT id FROM transaksi_siswa WHERE kantin_id = ? AND DATE(created_at) = CURDATE() AND type = 'keluar'
+            UNION ALL
+            SELECT id FROM transaksi_guru WHERE kantin_id = ? AND DATE(created_at) = CURDATE() AND type = 'keluar'
+        ) combined
     ");
-    $stmtCount->execute([$kantin_id]);
+    $stmtCount->execute([$kantin_id, $kantin_id]);
     $count = $stmtCount->fetch(PDO::FETCH_ASSOC);
 
     // 4. Ambil Riwayat Transaksi Terakhir (Last 5)
     $stmtHistory = $db->prepare("
-        SELECT ts.id, ts.nominal as amount, ts.created_at, s.nama as student_name
-        FROM transaksi_siswa ts
-        LEFT JOIN siswa s ON ts.siswa_id = s.id
-        WHERE ts.kantin_id = ? 
-        ORDER BY ts.created_at DESC 
+        SELECT * FROM (
+            SELECT ts.id, ts.nominal as amount, ts.created_at, s.nama as user_name
+            FROM transaksi_siswa ts
+            LEFT JOIN siswa s ON ts.siswa_id = s.id
+            WHERE ts.kantin_id = ? AND ts.type = 'keluar'
+            UNION ALL
+            SELECT tg.id, tg.nominal as amount, tg.created_at, g.nama as user_name
+            FROM transaksi_guru tg
+            LEFT JOIN guru g ON tg.guru_id = g.id
+            WHERE tg.kantin_id = ? AND tg.type = 'keluar'
+        ) combined
+        ORDER BY created_at DESC 
         LIMIT 5
     ");
-    $stmtHistory->execute([$kantin_id]);
+    $stmtHistory->execute([$kantin_id, $kantin_id]);
     $riwayat_db = $stmtHistory->fetchAll(PDO::FETCH_ASSOC);
     
     $riwayat = [];
     foreach($riwayat_db as $r) {
         $riwayat[] = [
             "id" => $r['id'],
-            "message" => "Pembayaran dari " . ($r['student_name'] ?? "Siswa"),
+            "message" => "Pembayaran dari " . ($r['user_name'] ?? "Anonim"),
             "amount" => (int)$r['amount'],
             "type" => "masuk",
             "created_at" => $r['created_at']

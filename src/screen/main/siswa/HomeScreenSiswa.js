@@ -11,7 +11,8 @@ import {
   Alert,
   useWindowDimensions,
   Modal,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -19,6 +20,9 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import apiClient, { IMAGE_BASE_URL } from '../../../api/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import ViewShot, { captureRef } from 'react-native-view-shot';
 
 const BLUE_PRIMARY = '#0B1E3F';
 const BLUE_DARK = '#0F172A';
@@ -29,7 +33,62 @@ const ACCENT = '#38BDF8';
 
 export default function HomeScreenSiswa({ navigation }) {
   const { width } = useWindowDimensions();
+  const viewShotRef = React.useRef(null);
+
+  const handleSaveQR = async () => {
+    if (!viewShotRef.current) {
+      Alert.alert('Peringatan', 'Desain kartu QR belum siap. Silakan coba sesaat lagi.');
+      return;
+    }
+
+    try {
+      let hasPermission = false;
+      let MediaLibrary = null;
+
+      try {
+        MediaLibrary = require('expo-media-library');
+        if (MediaLibrary) {
+          const { status } = await MediaLibrary.requestPermissionsAsync(true);
+          if (status === 'granted') {
+            hasPermission = true;
+          }
+        }
+      } catch (e) {
+        console.log("MediaLibrary not available:", e);
+      }
+
+      // Capture view shot
+      const uri = await captureRef(viewShotRef, {
+        format: 'png',
+        quality: 1.0,
+      });
+
+      if (!uri) {
+        throw new Error('Gagal merekam representasi gambar kartu QR Code.');
+      }
+
+      if (hasPermission && MediaLibrary) {
+        await MediaLibrary.createAssetAsync(uri);
+        Alert.alert('Sukses !', 'Desain Kartu QR Code Siswa Anda berhasil disimpan langsung ke galeri foto!');
+      } else {
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'image/png',
+            dialogTitle: 'Simpan QR Code Siswa',
+            UTI: 'public.png'
+          });
+        } else {
+          Alert.alert('Error', 'Fitur penyimpanan tidak tersedia di perangkat ini.');
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Gagal menyimpan kartu QR Code: ' + err.message);
+    }
+  };
+
   const [userData, setUserData] = useState(null);
+  const [profileImage, setProfileImage] = useState(null);
   const [stats, setStats] = useState({
     saldo: 0,
     poin: 0,
@@ -74,6 +133,7 @@ export default function HomeScreenSiswa({ navigation }) {
   useFocusEffect(
     React.useCallback(() => {
       if (userData?.id) {
+        AsyncStorage.getItem(`@profile_image_siswa_${userData.id}`).then(img => setProfileImage(img));
         fetchSiswaStats(userData.id);
         fetchCanteens(userData.id);
       }
@@ -124,6 +184,39 @@ export default function HomeScreenSiswa({ navigation }) {
     }
   };
 
+  const getUnreviewedTransaction = () => {
+    if (!stats?.riwayat) return null;
+    return stats.riwayat.find(item => {
+      if (!item.kantin_id || item.already_reviewed === 1) return false;
+      const txDate = item.created_at ? new Date(item.created_at.replace(' ', 'T')) : new Date();
+      const diffTime = Math.abs(new Date() - txDate);
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+      return diffDays <= 2;
+    });
+  };
+
+  const handleScanQR = () => {
+    const outstanding = getUnreviewedTransaction();
+    if (outstanding) {
+      Alert.alert(
+        "Ulasan Wajib",
+        "Anda wajib memberikan ulasan untuk transaksi sebelumnya sebelum dapat melakukan transaksi baru.",
+        [{
+          text: "Beri Ulasan Sekarang",
+          onPress: () => navigation.navigate('Feedback', {
+            canteenData: {
+              id: outstanding.kantin_id,
+              name: outstanding.nama_kantin || 'Kantin',
+              transaksi_id: outstanding.id
+            }
+          })
+        }]
+      );
+      return;
+    }
+    navigation.navigate('QRScanner');
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
     loadUserData().then(() => {
@@ -144,7 +237,9 @@ export default function HomeScreenSiswa({ navigation }) {
           text: "Logout",
           style: "destructive",
           onPress: async () => {
-            await AsyncStorage.clear();
+            await AsyncStorage.removeItem('user_data');
+            await AsyncStorage.removeItem('simulated_saldo');
+            await AsyncStorage.removeItem('@notifications');
             navigation.replace('Login');
           }
         }
@@ -171,8 +266,12 @@ export default function HomeScreenSiswa({ navigation }) {
           <SafeAreaView>
             <View style={styles.headerTop}>
               <View style={styles.userInfo}>
-                <View style={styles.avatarContainer}>
-                  <Text style={styles.avatarText}>{userData?.nama?.charAt(0) || 'S'}</Text>
+                <View style={[styles.avatarContainer, { overflow: 'hidden' }]}>
+                  {profileImage ? (
+                    <Image source={{ uri: profileImage }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+                  ) : (
+                    <Text style={styles.avatarText}>{userData?.nama?.charAt(0) || 'S'}</Text>
+                  )}
                 </View>
                 <View>
                   <Text style={styles.welcomeText}>{userData?.role === 'guru' ? 'SELAMAT DATANG GURU,' : 'SELAMAT DATANG SISWA,'}</Text>
@@ -206,9 +305,35 @@ export default function HomeScreenSiswa({ navigation }) {
             </View>
           </View>
 
+          {(() => {
+            const outstanding = getUnreviewedTransaction();
+            if (outstanding) {
+              return (
+                <TouchableOpacity 
+                  style={styles.mandatoryReviewBanner}
+                  onPress={() => navigation.navigate('Feedback', {
+                    canteenData: {
+                      id: outstanding.kantin_id,
+                      name: outstanding.nama_kantin || 'Kantin',
+                      transaksi_id: outstanding.id
+                    }
+                  })}
+                >
+                  <Ionicons name="warning" size={22} color="#B45309" style={{ marginRight: 10 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.mandatoryReviewTitle}>Ulasan Wajib Pending!</Text>
+                    <Text style={styles.mandatoryReviewSub}>Anda wajib mengulas makan di {outstanding.nama_kantin || 'Kantin'} sebelum bisa scan QR baru.</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#B45309" />
+                </TouchableOpacity>
+              );
+            }
+            return null;
+          })()}
+
           {/* QUICK ACTIONS */}
           <View style={styles.actionGrid}>
-            <TouchableOpacity style={styles.actionItem} onPress={() => navigation.navigate('QRScanner')}>
+            <TouchableOpacity style={styles.actionItem} onPress={handleScanQR}>
               <View style={[styles.actionIcon, { backgroundColor: '#F0FDF4' }]}><Ionicons name="scan" size={22} color={SUCCESS} /></View>
               <Text style={styles.actionLabel}>Scan QR</Text>
             </TouchableOpacity>
@@ -303,7 +428,7 @@ export default function HomeScreenSiswa({ navigation }) {
                 </Text>
               </View>
 
-              {item.kantin_id && (
+              {!!item.kantin_id && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 8 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Ionicons name="storefront-outline" size={14} color="#64748B" />
@@ -379,36 +504,71 @@ export default function HomeScreenSiswa({ navigation }) {
       {/* QR MODAL */}
       <Modal visible={showQRModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalCloseRow}>
-              <Text style={styles.modalHeaderTitle}>{userData?.role === 'guru' ? 'QR Code Guru' : 'QR Code Siswa'}</Text>
-              <TouchableOpacity onPress={() => setShowQRModal(false)}>
-                <Feather name="x" size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
+          <View style={[styles.modalCard, { position: 'relative', overflow: 'hidden' }]}>
+            {/* Absolute close button outside the ViewShot card */}
+            <TouchableOpacity
+              onPress={() => setShowQRModal(false)}
+              style={{
+                position: 'absolute',
+                top: 15,
+                right: 15,
+                zIndex: 10,
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: '#F1F5F9',
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}
+            >
+              <Feather name="x" size={18} color="#64748B" />
+            </TouchableOpacity>
 
-            <View style={styles.qrModalContent}>
-              <Text style={styles.qrNote}>Tunjukkan QR ini ke petugas kantin atau sekolah untuk verifikasi.</Text>
-
-              <View style={styles.qrWrapperModal}>
-                <View style={styles.qrBgModal}>
-                  <QRCode
-                    value={stats?.qr_code_token || userData?.username || String(userData?.id || userData?.nama || 'LAVIRA-SISWA')}
-                    size={200}
-                    color={BLUE_PRIMARY}
-                  />
+            <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1.0 }} style={{ backgroundColor: '#FFFFFF', alignItems: 'center', width: '100%', padding: 5 }}>
+              <View style={{ flexDirection: 'row', width: '100%', alignItems: 'center', marginBottom: 15, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: 12 }}>
+                <Image
+                  source={require('../../../../assets/LOGO_LAVIRAMEAL_CLEAN.png')}
+                  style={{ width: 36, height: 36, marginRight: 10 }}
+                />
+                <View>
+                  <Text style={[styles.modalHeaderTitle, { fontSize: 16, letterSpacing: 0.5 }]}>{userData?.role === 'guru' ? 'KARTU QR GURU' : 'KARTU QR SISWA'}</Text>
+                  <Text style={{ fontSize: 9, color: GOLD, fontWeight: '800', letterSpacing: 0.8 }}>LAVIRA MEAL ECOSYSTEM</Text>
                 </View>
               </View>
 
-              <View style={styles.studentInfoBox}>
-                <Text style={styles.infoName}>{userData?.nama}</Text>
-                <Text style={styles.infoNis}>{userData?.role === 'guru' ? 'NIP' : 'NIS'}: {userData?.username}</Text>
-              </View>
+              <View style={styles.qrModalContent}>
+                <Text style={styles.qrNote}>Tunjukkan QR ini ke petugas kantin atau sekolah untuk verifikasi.</Text>
 
-              <TouchableOpacity style={styles.closeBtn} onPress={() => setShowQRModal(false)}>
-                <Text style={styles.closeBtnText}>Tutup</Text>
-              </TouchableOpacity>
-            </View>
+                <View style={styles.qrWrapperModal}>
+                  <View style={styles.qrBgModal}>
+                    <QRCode
+                      value={stats?.qr_code_token || userData?.username || String(userData?.id || userData?.nama || 'LAVIRA-SISWA')}
+                      size={200}
+                      color={BLUE_PRIMARY}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.studentInfoBox}>
+                  <Text style={styles.infoName}>{userData?.nama}</Text>
+                  <Text style={styles.infoNis}>{userData?.role === 'guru' ? 'NIP' : 'NIS'}: {userData?.username}</Text>
+                </View>
+              </View>
+            </ViewShot>
+
+            <TouchableOpacity 
+              style={[styles.closeBtn, { backgroundColor: '#10B981', marginBottom: 10, marginTop: 15 }]} 
+              onPress={handleSaveQR}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="download-outline" size={18} color={WHITE} />
+                <Text style={styles.closeBtnText}>Simpan QR ke Galeri</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.closeBtn} onPress={() => setShowQRModal(false)}>
+              <Text style={styles.closeBtnText}>Tutup</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -468,7 +628,7 @@ export default function HomeScreenSiswa({ navigation }) {
                 </View>
               )}
 
-              {selectedTransaction?.type === 'keluar' && selectedTransaction?.kantin_id && (
+              {selectedTransaction?.type === 'keluar' && !!selectedTransaction?.kantin_id && (
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' }}>
                   <Text style={{ fontSize: 12, color: '#94A3B8', fontWeight: 'bold' }}>STATUS ULASAN</Text>
                   {selectedTransaction?.already_reviewed === 1 ? (
@@ -666,5 +826,31 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontWeight: '600',
     marginTop: 6,
+  },
+  mandatoryReviewBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 25,
+    elevation: 3,
+    shadowColor: '#B45309',
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+  },
+  mandatoryReviewTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#B45309',
+  },
+  mandatoryReviewSub: {
+    fontSize: 11,
+    color: '#D97706',
+    fontWeight: '500',
+    marginTop: 2,
+    lineHeight: 15,
   }
 });

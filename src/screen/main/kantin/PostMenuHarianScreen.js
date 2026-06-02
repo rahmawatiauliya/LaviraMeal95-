@@ -31,8 +31,7 @@ export default function PostMenuHarianScreen({ navigation }) {
   const [namaMenu, setNamaMenu] = useState('');
   const [deskripsi, setDeskripsi] = useState('');
   const [image, setImage] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [fetchingHistory, setFetchingHistory] = useState(true);
+  // History and feedback moved to RiwayatMenuHarianScreen
 
   useEffect(() => {
     loadKantinData();
@@ -47,7 +46,6 @@ export default function PostMenuHarianScreen({ navigation }) {
         const response = await apiClient.get(`kantin/get_kantin_profile.php?user_id=${parsed.id}`);
         if (response.data.status === 'success') {
            setKantinData(response.data.data);
-           fetchHistory(response.data.data.id);
         }
       }
     } catch (e) {
@@ -55,19 +53,7 @@ export default function PostMenuHarianScreen({ navigation }) {
     }
   };
 
-  const fetchHistory = async (kantinId) => {
-    try {
-      setFetchingHistory(true);
-      const response = await apiClient.get(`kantin/get_my_menu_harian.php?kantin_id=${kantinId}`);
-      if (response.data.status === 'success') {
-        setHistory(response.data.data);
-      }
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setFetchingHistory(false);
-    }
-  };
+  // fetchHistory removed as it is now separated
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -145,7 +131,6 @@ export default function PostMenuHarianScreen({ navigation }) {
         setNamaMenu('');
         setDeskripsi('');
         setImage(null);
-        fetchHistory(kantinData.id);
       } else {
         Alert.alert('Gagal', response.data.message);
       }
@@ -219,47 +204,13 @@ export default function PostMenuHarianScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.historySection}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
-              <Text style={styles.sectionTitle}>Riwayat Menu & Feedback</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('RiwayatMenuHarian')}>
-                <Text style={{ color: ACCENT, fontWeight: 'bold', fontSize: 12 }}>Lihat Semua</Text>
-              </TouchableOpacity>
-            </View>
-            {fetchingHistory ? (
-              <ActivityIndicator color={BLUE_PRIMARY} style={{ marginTop: 20 }} />
-            ) : history.length === 0 ? (
-              <View style={styles.emptyBox}>
-                <Text style={styles.emptyText}>Belum ada riwayat postingan.</Text>
-              </View>
-            ) : (
-              history.map((item, idx) => (
-                <View key={idx} style={styles.historyCard}>
-                  <View style={styles.historyHeader}>
-                    <Text style={styles.historyDate}>{new Date(item.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</Text>
-                    <View style={styles.historyBadge}>
-                      <Text style={styles.badgeText}>POSTED</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.historyMenu}>{item.nama_menu}</Text>
-                  
-                  {item.feedback_sppg && (
-                    <View style={[styles.feedbackBox, { borderColor: '#E0F2FE' }]}>
-                      <Text style={styles.feedbackLabel}>Feedback SPPG:</Text>
-                      <Text style={styles.feedbackText}>{item.feedback_sppg}</Text>
-                    </View>
-                  )}
-
-                  {item.feedback_sekolah && (
-                    <View style={[styles.feedbackBox, { borderColor: '#F0FDF4' }]}>
-                      <Text style={styles.feedbackLabel}>Feedback Sekolah:</Text>
-                      <Text style={styles.feedbackText}>{item.feedback_sekolah}</Text>
-                    </View>
-                  )}
-                </View>
-              ))
-            )}
-          </View>
+          <TouchableOpacity 
+            style={[styles.postBtn, { backgroundColor: WHITE, borderWidth: 1, borderColor: BLUE_PRIMARY, marginTop: 10, marginBottom: 30 }]} 
+            onPress={() => navigation.navigate('RiwayatMenuHarian')}
+          >
+            <Ionicons name="time-outline" size={20} color={BLUE_PRIMARY} />
+            <Text style={[styles.postBtnText, { color: BLUE_PRIMARY }]}>Lihat Riwayat & Feedback Menu</Text>
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

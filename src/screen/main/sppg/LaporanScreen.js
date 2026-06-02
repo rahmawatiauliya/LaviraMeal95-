@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import apiClient from '../../../api/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Platform } from 'react-native';
@@ -31,6 +31,8 @@ export default function LaporanScreen({ navigation }) {
   const { width } = useWindowDimensions();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showAllDistribusi, setShowAllDistribusi] = useState(false);
+  const [showAllVerifikasi, setShowAllVerifikasi] = useState(false);
   const [stats, setStats] = useState({
     point: '0',
     verif: '0',
@@ -45,11 +47,10 @@ export default function LaporanScreen({ navigation }) {
   const [endDate, setEndDate] = useState(new Date());
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
-  
-  // PREVIEW MODAL STATE
   const [previewVisible, setPreviewVisible] = useState(false);
-  const [previewData, setPreviewData] = useState([]);
   const [previewTitle, setPreviewTitle] = useState('');
+  const [previewData, setPreviewData] = useState([]);
+  const [previewType, setPreviewType] = useState('');
 
   const fetchData = useCallback(async () => {
     try {
@@ -89,7 +90,7 @@ export default function LaporanScreen({ navigation }) {
           id: (r.id || Math.random()).toString(),
           nama: r.nama_kantin || 'Kantin',
           sub: `${r.nama_sekolah || '-'} · ${r.tanggal || '-'}`,
-          status: r.status === 'completed' || r.status === 'Aktif' ? 'Disetujui' : 'Menunggu'
+          status: r.status === 'approved' || r.status === 'completed' || r.status === 'Aktif' || r.status === 'Disetujui' ? 'Disetujui' : 'Menunggu'
         })) || []);
       }
 
@@ -99,52 +100,67 @@ export default function LaporanScreen({ navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [startDate, endDate]);
 
   useEffect(() => {
     fetchData();
-  }, [fetchData, startDate, endDate]);
+  }, [fetchData]);
 
   const onRefresh = () => {
     setRefreshing(true);
     fetchData();
   };
 
-  const handlePreview = (type) => {
+  const handlePreviewReport = (type) => {
     const title = type === 'distribusi' ? 'Laporan Distribusi Point' : 'Laporan Verifikasi Kantin';
     const data = type === 'distribusi' ? distribusiData : verifikasiData;
+
+    if (!data || data.length === 0) {
+      Alert.alert("Info", `Tidak ada data ${title} untuk diekspor pada periode ini.`);
+      return;
+    }
+
     setPreviewTitle(title);
     setPreviewData(data);
+    setPreviewType(type);
     setPreviewVisible(true);
   };
 
-  const downloadExcel = async () => {
+  const downloadExcelDirect = async (type) => {
     try {
-      setPreviewVisible(false);
       setLoading(true);
+      const title = type === 'distribusi' ? 'Laporan Distribusi Point' : 'Laporan Verifikasi Kantin';
+      const data = type === 'distribusi' ? distribusiData : verifikasiData;
+
+      if (!data || data.length === 0) {
+        Alert.alert("Info", `Tidak ada data ${title} untuk diekspor pada periode ini.`);
+        return;
+      }
 
       // Create CSV content (Excel compatible)
       let csvContent = "\uFEFF"; // BOM for UTF-8
       csvContent += "ID;Nama/Institusi;Keterangan;Nominal;Status\n";
       
-      previewData.forEach(item => {
+      data.forEach(item => {
         csvContent += `${item.id};${item.nama};${item.sub};${item.amount || '-'};${item.status}\n`;
       });
 
-      const fileName = `${previewTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.csv`;
-      const fileUri = FileSystem.documentDirectory + fileName;
+      const fileName = `${title.replace(/\s+/g, '_')}_${new Date().getTime()}.csv`;
+      const baseDir = FileSystem.documentDirectory || FileSystem.cacheDirectory || "";
+      const fileUri = baseDir + fileName;
 
-      await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+      await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' });
       
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri, {
           mimeType: 'text/comma-separated-values',
-          dialogTitle: 'Download Laporan Excel',
+          dialogTitle: `Download ${title}`,
           UTI: 'public.comma-separated-values-text'
         });
       } else {
         Alert.alert("Gagal", "Fitur berbagi file tidak tersedia di perangkat ini.");
       }
+      setPreviewVisible(false);
     } catch (error) {
       console.error(error);
       Alert.alert("Error", "Gagal mengunduh file excel.");
@@ -165,9 +181,6 @@ export default function LaporanScreen({ navigation }) {
         <SafeAreaView>
           <View style={styles.headerTop}>
             <Text style={styles.headerTitle}>Laporan</Text>
-            <TouchableOpacity style={styles.iconBtn} onPress={() => handlePreview('distribusi')}>
-              <Feather name="eye" size={22} color={WHITE} />
-            </TouchableOpacity>
           </View>
 
           <View style={styles.dateFilterContainer}>
@@ -219,50 +232,98 @@ export default function LaporanScreen({ navigation }) {
       </View>
 
       <View style={styles.whiteSection}>
-        <ScrollView 
-          showsVerticalScrollIndicator={false} 
-          contentContainerStyle={{ paddingBottom: 120 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        >
-          
+        {loading && !refreshing ? (
+          <ActivityIndicator color={BLUE_PRIMARY} size="large" style={{ marginTop: 40 }} />
+        ) : (
+          <ScrollView 
+            showsVerticalScrollIndicator={false} 
+            contentContainerStyle={{ paddingBottom: 120 }}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          >
+            {/* DISTRIBUSI POINT */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Distribusi Point</Text>
+                <TouchableOpacity style={styles.miniExcel} onPress={() => handlePreviewReport('distribusi')}>
+                  <MaterialCommunityIcons name="file-excel" size={12} color={WHITE} />
+                  <Text style={styles.miniExcelText}>Export Excel</Text>
+                </TouchableOpacity>
+              </View>
 
-
-          {/* DISTRIBUSI POINT */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Distribusi Point</Text>
-              <TouchableOpacity style={styles.miniExcel} onPress={() => handlePreview('distribusi')}>
-                <Feather name="eye" size={12} color={WHITE} />
-                <Text style={styles.miniExcelText}>Preview</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.listContainer}>
-              {distribusiData.slice(0, 2).map((item) => (
-                <View key={item.id} style={styles.listItem}>
-                  <View style={styles.listIconBox}>
-                    <Ionicons name="business" size={20} color="#4F46E5" />
-                  </View>
-                  <View style={styles.listBody}>
-                    <Text style={styles.listTitle}>{item.nama}</Text>
-                    <Text style={styles.listSub}>{item.sub}</Text>
-                  </View>
-                  <View style={styles.listTail}>
-                    <Text style={[styles.listAmount, { color: '#10B981' }]}>+{Number(item.amount).toLocaleString('id-ID')}</Text>
-                    <View style={[styles.badge, { backgroundColor: item.status === 'Berhasil' ? '#ECFDF5' : '#FFF7ED' }]}>
-                      <Text style={[styles.badgeText, { color: item.status === 'Berhasil' ? '#10B981' : '#F59E0B' }]}>{item.status}</Text>
+              <View style={styles.listContainer}>
+                {distribusiData.length === 0 ? (
+                  <Text style={{ textAlign: 'center', color: '#94A3B8', padding: 20 }}>Belum ada data distribusi</Text>
+                ) : (
+                  (showAllDistribusi ? distribusiData : distribusiData.slice(0, 2)).map((item) => (
+                    <View key={item.id} style={styles.listItem}>
+                      <View style={styles.listIconBox}>
+                        <Ionicons name="business" size={20} color="#4F46E5" />
+                      </View>
+                      <View style={styles.listBody}>
+                        <Text style={styles.listTitle}>{item.nama}</Text>
+                        <Text style={styles.listSub}>{item.sub}</Text>
+                      </View>
+                      <View style={styles.listTail}>
+                        <Text style={[styles.listAmount, { color: '#10B981' }]}>{`+${Number(item.amount).toLocaleString('id-ID')}`}</Text>
+                        <View style={[styles.badge, { backgroundColor: item.status === 'Berhasil' ? '#ECFDF5' : '#FFF7ED' }]}>
+                          <Text style={[styles.badgeText, { color: item.status === 'Berhasil' ? '#10B981' : '#F59E0B' }]}>{item.status}</Text>
+                        </View>
+                      </View>
                     </View>
-                  </View>
-                </View>
-              ))}
-              <TouchableOpacity style={styles.seeAll} onPress={() => handlePreview('distribusi')}>
-                <Text style={styles.seeAllText}>Lihat semua →</Text>
-              </TouchableOpacity>
+                  ))
+                )}
+                {distribusiData.length > 2 && (
+                  <TouchableOpacity style={styles.seeAll} onPress={() => setShowAllDistribusi(!showAllDistribusi)}>
+                    <Text style={styles.seeAllText}>
+                      {showAllDistribusi ? '← Sembunyikan' : 'Lihat semua →'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
-          </View>
 
+            {/* VERIFIKASI KANTIN */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Verifikasi Kantin</Text>
+                <TouchableOpacity style={styles.miniExcel} onPress={() => handlePreviewReport('verifikasi')}>
+                  <MaterialCommunityIcons name="file-excel" size={12} color={WHITE} />
+                  <Text style={styles.miniExcelText}>Export Excel</Text>
+                </TouchableOpacity>
+              </View>
 
-        </ScrollView>
+              <View style={styles.listContainer}>
+                {verifikasiData.length === 0 ? (
+                  <Text style={{ textAlign: 'center', color: '#94A3B8', padding: 20 }}>Belum ada data verifikasi</Text>
+                ) : (
+                  (showAllVerifikasi ? verifikasiData : verifikasiData.slice(0, 2)).map((item) => (
+                    <View key={item.id} style={styles.listItem}>
+                      <View style={[styles.listIconBox, { backgroundColor: '#F0FDF4' }]}>
+                        <Ionicons name="shield-checkmark" size={20} color="#10B981" />
+                      </View>
+                      <View style={styles.listBody}>
+                        <Text style={styles.listTitle}>{item.nama}</Text>
+                        <Text style={styles.listSub}>{item.sub}</Text>
+                      </View>
+                      <View style={styles.listTail}>
+                        <View style={[styles.badge, { backgroundColor: item.status === 'Disetujui' ? '#ECFDF5' : '#FFF7ED' }]}>
+                          <Text style={[styles.badgeText, { color: item.status === 'Disetujui' ? '#10B981' : '#F59E0B' }]}>{item.status}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))
+                )}
+                {verifikasiData.length > 2 && (
+                  <TouchableOpacity style={styles.seeAll} onPress={() => setShowAllVerifikasi(!showAllVerifikasi)}>
+                    <Text style={styles.seeAllText}>
+                      {showAllVerifikasi ? '← Sembunyikan' : 'Lihat semua →'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </ScrollView>
+        )}
       </View>
 
       {/* PREVIEW MODAL */}
@@ -281,21 +342,21 @@ export default function LaporanScreen({ navigation }) {
             <View style={styles.previewTable}>
                <View style={styles.tableHeader}>
                  <Text style={[styles.th, { flex: 2 }]}>Nama</Text>
-                 <Text style={[styles.th, { flex: 1 }]}>Nominal</Text>
+                 <Text style={[styles.th, { flex: 1 }]}>{previewType === 'distribusi' ? 'Nominal' : 'Status'}</Text>
                  <Text style={[styles.th, { flex: 1 }]}>Status</Text>
                </View>
                <ScrollView style={{ maxHeight: 300 }}>
                  {previewData.map((item, idx) => (
                    <View key={idx} style={styles.tableRow}>
                      <Text style={[styles.td, { flex: 2 }]} numberOfLines={1}>{item.nama}</Text>
-                     <Text style={[styles.td, { flex: 1 }]}>{item.amount ? Number(item.amount).toLocaleString('id-ID') : '-'}</Text>
+                     <Text style={[styles.td, { flex: 1 }]}>{previewType === 'distribusi' ? (item.amount ? Number(item.amount).toLocaleString('id-ID') : '-') : item.status}</Text>
                      <Text style={[styles.td, { flex: 1, color: item.status === 'Disetujui' || item.status === 'Berhasil' ? '#10B981' : '#F59E0B' }]}>{item.status}</Text>
                    </View>
                  ))}
                </ScrollView>
             </View>
 
-            <TouchableOpacity style={styles.downloadFinalBtn} onPress={downloadExcel}>
+            <TouchableOpacity style={styles.downloadFinalBtn} onPress={() => downloadExcelDirect(previewType)}>
               <MaterialCommunityIcons name="file-excel" size={20} color={WHITE} />
               <Text style={styles.downloadFinalText}>KONFIRMASI & DOWNLOAD EXCEL</Text>
             </TouchableOpacity>

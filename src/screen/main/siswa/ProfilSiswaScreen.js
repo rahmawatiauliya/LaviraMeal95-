@@ -20,6 +20,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '../../../api/client';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import QRCode from 'react-native-qrcode-svg';
 
 const BLUE_PRIMARY = '#0B1E3F';
@@ -58,7 +59,6 @@ export default function ProfilSiswaScreen({ navigation }) {
   useFocusEffect(
     React.useCallback(() => {
       loadUserData();
-      AsyncStorage.getItem('@profile_image').then(img => img && setProfileImage(img));
     }, [])
   );
 
@@ -73,6 +73,8 @@ export default function ProfilSiswaScreen({ navigation }) {
           displayJabatan: `Kelas ${parsed.kelas || 'Umum'}`,
         });
         setEditedData(parsed);
+        const img = await AsyncStorage.getItem(`@profile_image_siswa_${parsed.id}`);
+        if (img) setProfileImage(img);
       }
     } catch (e) { console.error('Error loading user data:', e); }
   };
@@ -92,9 +94,27 @@ export default function ProfilSiswaScreen({ navigation }) {
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      const selectedUri = result.assets[0].uri;
+      let selectedUri = result.assets[0].uri;
+      try {
+        if (FileSystem.documentDirectory) {
+          const dir = `${FileSystem.documentDirectory}profile/`;
+          const dirInfo = await FileSystem.getInfoAsync(dir);
+          if (!dirInfo.exists) {
+            await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+          }
+          const filename = `profile_${Date.now()}.jpg`;
+          const permanentUri = `${dir}${filename}`;
+          await FileSystem.copyAsync({
+            from: selectedUri,
+            to: permanentUri
+          });
+          selectedUri = permanentUri;
+        }
+      } catch (fsError) {
+        console.log("File system copy failed, falling back to temp URI:", fsError);
+      }
       setProfileImage(selectedUri);
-      await AsyncStorage.setItem('@profile_image', selectedUri);
+      await AsyncStorage.setItem(`@profile_image_siswa_${userData.id}`, selectedUri);
       Alert.alert("Berhasil", "Foto profil Anda telah diperbarui.");
     }
   };
@@ -174,7 +194,9 @@ export default function ProfilSiswaScreen({ navigation }) {
         text: "Keluar", 
         style: 'destructive',
         onPress: async () => {
-          await AsyncStorage.clear();
+          await AsyncStorage.removeItem('user_data');
+          await AsyncStorage.removeItem('simulated_saldo');
+          await AsyncStorage.removeItem('@notifications');
           navigation.replace('Login');
         }
       }

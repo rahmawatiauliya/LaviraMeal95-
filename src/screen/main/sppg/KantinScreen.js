@@ -321,6 +321,30 @@ export default function KantinScreen({ navigation }) {
 
             {/* Footer Buttons */}
             <View style={styles.sheetFooterBtns}>
+              <TouchableOpacity 
+                style={{ 
+                  backgroundColor: '#D4AF37', 
+                  paddingVertical: 16, 
+                  borderRadius: 18, 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  flexDirection: 'row', 
+                  gap: 8,
+                  marginBottom: 8
+                }} 
+                onPress={() => {
+                  setCanteenDetailModal(false);
+                  navigation.navigate('CanteenFeedback', {
+                    kantin_id: selectedCanteenData?.kantin_id || selectedCanteenData?.id,
+                    nama_kantin: selectedCanteenData?.nama_kantin,
+                    foto_kantin: selectedCanteenData?.foto_kantin
+                  });
+                }}
+              >
+                <Ionicons name="star" size={16} color={WHITE} />
+                <Text style={{ color: WHITE, fontSize: 15, fontWeight: 'bold' }}>Lihat Ulasan & Rating</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity style={styles.sheetCloseBtn} onPress={() => setCanteenDetailModal(false)}>
                 <Text style={styles.sheetCloseBtnTxt}>Tutup</Text>
               </TouchableOpacity>

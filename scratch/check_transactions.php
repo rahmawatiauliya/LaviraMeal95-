@@ -1,20 +1,8 @@
 <?php
-include_once __DIR__ . '/../api/shared/config.php';
-header("Content-Type: text/plain");
+include 'api/shared/config.php';
+$stmt = $db->query("SELECT * FROM kantin");
+print_r($stmt->fetchAll(PDO::FETCH_ASSOC));
 
-function dumpTable($db, $table) {
-    echo "=== $table ===\n";
-    try {
-        $stmt = $db->query("SELECT * FROM `$table` ORDER BY created_at DESC LIMIT 5");
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            print_r($row);
-        }
-    } catch (Exception $e) {
-        echo "Error: " . $e->getMessage() . "\n";
-    }
-    echo "\n";
-}
-
-dumpTable($db, 'transaksi_siswa');
-dumpTable($db, 'transaksi_guru');
+$stmt2 = $db->query("SELECT * FROM transaksi_siswa");
+print_r($stmt2->fetchAll(PDO::FETCH_ASSOC));
 ?>

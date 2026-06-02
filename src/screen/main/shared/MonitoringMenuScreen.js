@@ -208,11 +208,11 @@ export default function MonitoringMenuScreen({ navigation }) {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" />
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color={WHITE} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Pantau Menu Kantin</Text>
-                <View style={{ width: 24 }} />
+                <View style={styles.headerRightPlaceholder} />
             </View>
 
             {loading && !refreshing ? (
@@ -316,12 +316,27 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingTop: 50,
+        paddingTop: 40,
         borderBottomLeftRadius: 30,
         borderBottomRightRadius: 30,
         elevation: 10,
     },
-    headerTitle: { color: WHITE, fontSize: 18, fontWeight: '900' },
+    backButton: {
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerTitle: { 
+        color: WHITE, 
+        fontSize: 18, 
+        fontWeight: '900',
+        flex: 1,
+        textAlign: 'center',
+    },
+    headerRightPlaceholder: {
+        width: 40,
+    },
     listContent: { padding: 20 },
     card: {
         backgroundColor: WHITE,

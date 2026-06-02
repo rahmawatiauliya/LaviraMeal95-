@@ -42,7 +42,8 @@ export default function AturJadwalPoinScreen({ navigation }) {
                 // Tambahkan field amount untuk input lokal
                 const data = response.data.data.map(s => ({
                     ...s,
-                    monthly_amount: s.monthly_amount ? String(s.monthly_amount) : '0',
+                    // Hapus desimal .00 — tampilkan sebagai bilangan bulat
+                    monthly_amount: s.monthly_amount ? String(parseInt(s.monthly_amount)) : '0',
                     distribution_day: s.distribution_day ? String(s.distribution_day) : '1',
                     is_distributed: s.last_distributed && s.last_distributed.startsWith(new Date().toISOString().slice(0, 7))
                 }));
@@ -80,44 +81,54 @@ export default function AturJadwalPoinScreen({ navigation }) {
     };
 
     const saveSchedule = async (school) => {
+        // Jika sudah terkirim bulan ini, jangan proses
+        if (school.is_distributed) {
+            Alert.alert("Sudah Terkirim", `${school.nama_sekolah} sudah menerima distribusi poin bulan ini.`);
+            return;
+        }
+
         setSubmitting(true);
         try {
             const payload = {
                 sekolah_id: school.id,
-                monthly_amount: parseFloat(school.monthly_amount) || 0,
+                monthly_amount: parseInt(school.monthly_amount) || 0,
                 distribution_day: parseInt(school.distribution_day) || 1
             };
             
-            // 1. Simpan Jadwal ke Database
+            // 1. Simpan Jadwal ke Database (tidak reset last_distributed)
             const response = await apiClient.post('sppg/set_scheduled_points.php', payload);
             
             if (response.data.status === 'success') {
                 const today = new Date().getDate();
                 
-                // 2. Jika tanggal distribusi adalah HARI INI atau SUDAH LEWAT, langsung picu pengiriman
+                // 2. Jika tanggal distribusi HARI INI atau SUDAH LEWAT, kirim hanya ke sekolah ini
                 if (parseInt(school.distribution_day) <= today) {
-                    setSubmitting(true); // Tampilkan loading lagi untuk proses distribusi
-                    const distResponse = await apiClient.get('sppg/process_monthly_points.php');
+                    const distResponse = await apiClient.post(
+                        'sppg/process_single_school_points.php',
+                        { sekolah_id: school.id }
+                    );
                     
                     if (distResponse.data.status === 'success') {
-                        Alert.alert("Distribusi Berhasil", `Jadwal disimpan dan Poin langsung dikirim secara real-time ke ${school.nama_sekolah}!`);
-                    } else if (distResponse.data.status === 'error') {
-                        Alert.alert("Gagal Distribusi Otomatis", distResponse.data.message || "Gagal memproses pengiriman bulan ini.");
+                        Alert.alert("Distribusi Berhasil", `Poin berhasil dikirim ke ${school.nama_sekolah}!`);
+                    } else if (distResponse.data.status === 'already_distributed') {
+                        Alert.alert("Info", distResponse.data.message);
+                    } else if (distResponse.data.status === 'not_yet') {
+                        Alert.alert("Jadwal Tersimpan", distResponse.data.message);
                     } else {
-                        Alert.alert("Jadwal Tersimpan", "Jadwal berhasil diperbarui. Poin akan dikirim otomatis oleh sistem pada tanggal tersebut.");
+                        Alert.alert("Gagal Distribusi", distResponse.data.message || "Gagal memproses pengiriman.");
                     }
                 } else {
                     Alert.alert("Berhasil", `Jadwal diperbarui. Poin akan otomatis dikirim pada tanggal ${school.distribution_day} bulan ini.`);
                 }
                 
-                // Refresh data untuk update UI (Checklist Hijau)
+                // Refresh data untuk update UI
                 fetchSchools();
             } else {
                 Alert.alert("Gagal Menyimpan Jadwal", response.data.message || "Terjadi kesalahan pada database.");
             }
         } catch (error) {
             console.error(error);
-            Alert.alert("Error", "Gagal melakukan sinkronisasi real-time.");
+            Alert.alert("Error", "Gagal melakukan sinkronisasi.");
         } finally {
             setSubmitting(false);
         }
@@ -161,20 +172,20 @@ export default function AturJadwalPoinScreen({ navigation }) {
             <View style={styles.inputGrid}>
                 <View style={styles.inputWrapper}>
                     <Text style={styles.inputLabel}>Jatah Poin</Text>
-                    <View style={[styles.inputBox, item.is_distributed && { backgroundColor: '#F8F9FA' }]}>
+                    <View style={styles.inputBox}>
                         <TextInput
                             style={styles.input}
                             keyboardType="numeric"
                             value={item.monthly_amount}
                             onChangeText={(text) => updateAmount(item.id, text)}
-                            editable={!item.is_distributed}
+                            editable={true}
                         />
                         <Text style={styles.unit}>PTS</Text>
                     </View>
                 </View>
                 <View style={styles.inputWrapper}>
                     <Text style={styles.inputLabel}>Tgl Kirim</Text>
-                    <View style={[styles.inputBox, item.is_distributed && { backgroundColor: '#F8F9FA' }]}>
+                    <View style={styles.inputBox}>
                         <Text style={styles.prefix}>Tgl</Text>
                         <TextInput
                             style={styles.inputSmall}
@@ -182,26 +193,25 @@ export default function AturJadwalPoinScreen({ navigation }) {
                             maxLength={2}
                             value={item.distribution_day}
                             onChangeText={(text) => updateDay(item.id, text)}
-                            editable={!item.is_distributed}
+                            editable={true}
                         />
                     </View>
                 </View>
                 
-                {item.is_distributed ? (
-                    <TouchableOpacity 
-                        style={[styles.saveBtn, { backgroundColor: '#1F9225' }]}
-                        onPress={() => showHistory(item)}
-                    >
-                        <Ionicons name="checkmark-circle" size={24} color={WHITE} />
-                    </TouchableOpacity>
-                ) : (
-                    <TouchableOpacity 
-                        style={styles.saveBtn}
-                        onPress={() => saveSchedule(item)}
-                    >
-                        <Ionicons name="pencil" size={20} color={WHITE} />
-                    </TouchableOpacity>
-                )}
+                <TouchableOpacity 
+                    style={[
+                        styles.saveBtn,
+                        item.is_distributed && styles.saveBtnDisabled
+                    ]}
+                    onPress={() => saveSchedule(item)}
+                    disabled={item.is_distributed}
+                >
+                    <Ionicons 
+                        name={item.is_distributed ? "checkmark" : "pencil"} 
+                        size={20} 
+                        color={item.is_distributed ? '#A0AEC0' : WHITE} 
+                    />
+                </TouchableOpacity>
             </View>
         </View>
     );
@@ -472,6 +482,11 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.2,
         shadowRadius: 8,
         elevation: 6,
+    },
+    saveBtnDisabled: {
+        backgroundColor: '#E2E8F0',
+        shadowOpacity: 0,
+        elevation: 0,
     },
     emptyText: { textAlign: 'center', marginTop: 50, color: '#718096', fontWeight: '600' }
 });

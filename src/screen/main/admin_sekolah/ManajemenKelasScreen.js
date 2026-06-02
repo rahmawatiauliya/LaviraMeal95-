@@ -1109,6 +1109,20 @@ export default function ManajemenKelasScreen({ navigation }) {
                   </View>
                 </View>
 
+                <View style={styles.pinInputGroup}>
+                  <Text style={styles.pinInputLabel}>Wali Kelas (Opsional)</Text>
+                  <View style={styles.pinInputWrap}>
+                    <Ionicons name="school-outline" size={18} color="#94a3b8" />
+                    <TextInput 
+                      style={styles.pinInput} 
+                      placeholder="Contoh: 10-IPA-1" 
+                      autoCapitalize="characters"
+                      value={newGuru.kelas_wali}
+                      onChangeText={(v) => setNewGuru({...newGuru, kelas_wali: v})}
+                    />
+                  </View>
+                </View>
+
                 <TouchableOpacity 
                   style={[styles.pinSubmit, { backgroundColor: '#8B5CF6' }, isAdding && { opacity: 0.7 }]} 
                   onPress={handleAddGuru}

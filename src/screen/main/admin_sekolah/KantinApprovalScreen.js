@@ -115,8 +115,8 @@ export default function KantinApprovalScreen({ navigation }) {
           <Text style={styles.kantinName}>{item.nama_kantin}</Text>
           <Text style={styles.ownerText}>Pemilik: {item.pemilik}</Text>
           <View style={styles.infoRow}>
-            <Ionicons name="call-outline" size={12} color="#64748B" />
-            <Text style={styles.infoText}>{item.no_telp || '-'}</Text>
+            <Ionicons name="mail-outline" size={12} color="#64748B" />
+            <Text style={styles.infoText}>{item.user_email || '-'}</Text>
             <View style={{ width: 10 }} />
             <Ionicons name="restaurant-outline" size={12} color="#64748B" />
             <Text style={styles.infoText}>{item.kapasitas_porsi} Porsi/Hari</Text>
@@ -157,7 +157,7 @@ export default function KantinApprovalScreen({ navigation }) {
                 <View style={styles.detailBox}>
                   <Text style={styles.detailText}><Text style={styles.bold}>Nama:</Text> {selectedKantin.nama_kantin}</Text>
                   <Text style={styles.detailText}><Text style={styles.bold}>Pemilik:</Text> {selectedKantin.pemilik}</Text>
-                  <Text style={styles.detailText}><Text style={styles.bold}>WhatsApp:</Text> {selectedKantin.no_telp || '-'}</Text>
+                  <Text style={styles.detailText}><Text style={styles.bold}>Email:</Text> {selectedKantin.user_email || '-'}</Text>
                   <Text style={styles.detailText}><Text style={styles.bold}>Kapasitas:</Text> {selectedKantin.kapasitas_porsi} Porsi/Hari</Text>
                 </View>
 

@@ -20,6 +20,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '../../../api/client';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 
 const BLUE_PRIMARY = '#0B1E3F';
 const BLUE_ACCENT = '#38BDF8';
@@ -58,7 +59,6 @@ export default function ProfilKantinScreen({ navigation }) {
   useFocusEffect(
     React.useCallback(() => {
       loadUserData();
-      AsyncStorage.getItem('@profile_image').then(img => img && setProfileImage(img));
     }, [])
   );
 
@@ -73,6 +73,8 @@ export default function ProfilKantinScreen({ navigation }) {
           displayLembaga: parsed.nama_sekolah || 'UNIT KANTIN SEKOLAH',
           region: parsed.kota ? `${parsed.kota}, ${parsed.provinsi}` : 'Kab. Karawang, Jawa Barat'
         }));
+        const img = await AsyncStorage.getItem(`@profile_image_kantin_${parsed.id}`);
+        if (img) setProfileImage(img);
       }
     } catch (e) { console.error('Error loading user data:', e); }
   };
@@ -92,9 +94,27 @@ export default function ProfilKantinScreen({ navigation }) {
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      const selectedUri = result.assets[0].uri;
+      let selectedUri = result.assets[0].uri;
+      try {
+        if (FileSystem.documentDirectory) {
+          const dir = `${FileSystem.documentDirectory}profile/`;
+          const dirInfo = await FileSystem.getInfoAsync(dir);
+          if (!dirInfo.exists) {
+            await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+          }
+          const filename = `profile_${Date.now()}.jpg`;
+          const permanentUri = `${dir}${filename}`;
+          await FileSystem.copyAsync({
+            from: selectedUri,
+            to: permanentUri
+          });
+          selectedUri = permanentUri;
+        }
+      } catch (fsError) {
+        console.log("File system copy failed, falling back to temp URI:", fsError);
+      }
       setProfileImage(selectedUri);
-      await AsyncStorage.setItem('@profile_image', selectedUri);
+      await AsyncStorage.setItem(`@profile_image_kantin_${userData.id}`, selectedUri);
       Alert.alert("Berhasil", "Foto profil Anda telah diperbarui.");
     }
   };
@@ -310,20 +330,12 @@ export default function ProfilKantinScreen({ navigation }) {
            </View>
 
            <View style={[styles.tilesRow, { marginTop: 15 }]}>
-              <TouchableOpacity style={styles.premiumTile} onPress={() => navigation.navigate('MonitoringMenu')}>
-                 <View style={[styles.tileIconBox, { backgroundColor: '#F5F3FF' }]}>
-                    <Feather name="book-open" size={20} color="#8B5CF6" />
-                 </View>
-                 <Text style={styles.tileMainTxt}>Kelola Menu</Text>
-                 <Text style={styles.tileSubTxt}>Daftar makanan</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.premiumTile} onPress={() => navigation.navigate('LaporanKantin')}>
+              <TouchableOpacity style={[styles.premiumTile, { width: '100%' }]} onPress={() => navigation.navigate('LaporanKantin')}>
                  <View style={[styles.tileIconBox, { backgroundColor: '#FFFBEB' }]}>
                     <Feather name="bar-chart-2" size={20} color="#F59E0B" />
                  </View>
                  <Text style={styles.tileMainTxt}>Laporan</Text>
-                 <Text style={styles.tileSubTxt}>Statistik harian</Text>
+                 <Text style={styles.tileSubTxt}>Statistik harian kantin</Text>
               </TouchableOpacity>
            </View>
         </View>

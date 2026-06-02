@@ -64,7 +64,7 @@ try {
         $kantin_aktif = (int)$stmtKantin->fetch(PDO::FETCH_ASSOC)['total'];
         
         // List detail kantin
-        $stmtKantinList = $db->prepare("SELECT id, nama_kantin, pemilik AS penanggung_jawab, is_aktif FROM kantin WHERE sekolah_id = :id ORDER BY is_aktif DESC");
+        $stmtKantinList = $db->prepare("SELECT id, nama_kantin, pemilik AS penanggung_jawab, is_aktif, foto_kantin FROM kantin WHERE sekolah_id = :id ORDER BY is_aktif DESC");
         $stmtKantinList->execute([':id' => $sekolah_id]);
         $kantin_list = $stmtKantinList->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {}
@@ -111,17 +111,17 @@ try {
         if ($kelas_filter) {
             $stmtClaimed = $db->prepare("
                 SELECT COUNT(*) as total 
-                FROM konsumsi_siswa ks 
-                JOIN siswa sw ON ks.siswa_id = sw.id 
-                WHERE sw.sekolah_id = :sekolah_id AND ks.makan = 1 AND DATE(ks.waktu_scan) = :date_str AND sw.kelas = :kelas
+                FROM siswa_pengambilan_mbg sp 
+                JOIN siswa sw ON sp.siswa_id = sw.id 
+                WHERE sw.sekolah_id = :sekolah_id AND DATE(sp.tanggal) = :date_str AND sw.kelas = :kelas
             ");
             $stmtClaimed->execute([':sekolah_id' => $sekolah_id, ':date_str' => $date_str, ':kelas' => $kelas_filter]);
         } else {
             $stmtClaimed = $db->prepare("
                 SELECT COUNT(*) as total 
-                FROM konsumsi_siswa ks 
-                JOIN siswa sw ON ks.siswa_id = sw.id 
-                WHERE sw.sekolah_id = :sekolah_id AND ks.makan = 1 AND DATE(ks.waktu_scan) = :date_str
+                FROM siswa_pengambilan_mbg sp 
+                JOIN siswa sw ON sp.siswa_id = sw.id 
+                WHERE sw.sekolah_id = :sekolah_id AND DATE(sp.tanggal) = :date_str
             ");
             $stmtClaimed->execute([':sekolah_id' => $sekolah_id, ':date_str' => $date_str]);
         }
@@ -155,22 +155,48 @@ try {
     if ($kelas_filter) {
         $stmtPie = $db->prepare("
             SELECT COUNT(*) as total 
-            FROM konsumsi_siswa ks 
-            JOIN siswa sw ON ks.siswa_id = sw.id 
-            WHERE sw.sekolah_id = :id AND ks.makan = 1 AND DATE(ks.waktu_scan) = :date_str AND sw.kelas = :kelas
+            FROM siswa_pengambilan_mbg sp 
+            JOIN siswa sw ON sp.siswa_id = sw.id 
+            WHERE sw.sekolah_id = :id AND DATE(sp.tanggal) = :date_str AND sw.kelas = :kelas
         ");
         $stmtPie->execute([':id' => $sekolah_id, ':date_str' => $active_date, ':kelas' => $kelas_filter]);
     } else {
         $stmtPie = $db->prepare("
             SELECT COUNT(*) as total 
-            FROM konsumsi_siswa ks 
-            JOIN siswa sw ON ks.siswa_id = sw.id 
-            WHERE sw.sekolah_id = :id AND ks.makan = 1 AND DATE(ks.waktu_scan) = :date_str
+            FROM siswa_pengambilan_mbg sp 
+            JOIN siswa sw ON sp.siswa_id = sw.id 
+            WHERE sw.sekolah_id = :id AND DATE(sp.tanggal) = :date_str
         ");
         $stmtPie->execute([':id' => $sekolah_id, ':date_str' => $active_date]);
     }
     $pie_claimed = (int)$stmtPie->fetch(PDO::FETCH_ASSOC)['total'];
     $pie_unclaimed = max(0, $total_siswa - $pie_claimed);
+
+    // 10. Calculate breakdown for each class on the active date
+    $kelas_breakdown = [];
+    foreach ($daftar_kelas as $kls) {
+        $stmtCountSiswa = $db->prepare("SELECT COUNT(*) as total FROM siswa WHERE sekolah_id = :id AND kelas = :kelas");
+        $stmtCountSiswa->execute([':id' => $sekolah_id, ':kelas' => $kls]);
+        $total_siswa_kelas = (int)$stmtCountSiswa->fetch(PDO::FETCH_ASSOC)['total'];
+
+        $stmtCountScan = $db->prepare("
+            SELECT COUNT(*) as total 
+            FROM siswa_pengambilan_mbg sp 
+            JOIN siswa sw ON sp.siswa_id = sw.id 
+            WHERE sw.sekolah_id = :id AND DATE(sp.tanggal) = :date_str AND sw.kelas = :kelas
+        ");
+        $stmtCountScan->execute([':id' => $sekolah_id, ':date_str' => $active_date, ':kelas' => $kls]);
+        $sudah_scan = (int)$stmtCountScan->fetch(PDO::FETCH_ASSOC)['total'];
+
+        $presentase = $total_siswa_kelas > 0 ? round(($sudah_scan / $total_siswa_kelas) * 100) : 0;
+
+        $kelas_breakdown[] = [
+            "kelas" => $kls,
+            "total_siswa" => $total_siswa_kelas,
+            "sudah_scan" => $sudah_scan,
+            "presentase" => $presentase
+        ];
+    }
 
     echo json_encode([
         "status" => "success",
@@ -197,7 +223,8 @@ try {
             "pie_chart" => [
                 "taking" => $pie_claimed,
                 "not_taking" => $pie_unclaimed,
-                "date" => $active_date
+                "date" => $active_date,
+                "kelas_breakdown" => $kelas_breakdown
             ],
             "daftar_kelas" => $daftar_kelas,
             "daftar_tanggal" => $daftar_tanggal

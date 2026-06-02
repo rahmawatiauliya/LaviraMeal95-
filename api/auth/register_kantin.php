@@ -12,6 +12,7 @@ if ($method == 'POST') {
     $wilayah_id = $_POST['wilayah_id'] ?? ''; 
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
+    $kapasitas_porsi = isset($_POST['kapasitas_porsi']) ? intval($_POST['kapasitas_porsi']) : 0;
 
     if (empty($nama_pemilik) || empty($email_pemilik) || empty($nama_kantin) || empty($username) || empty($password)) {
         echo json_encode(["status" => "error", "message" => "Harap lengkapi semua data wajib."]);
@@ -74,8 +75,8 @@ if ($method == 'POST') {
         // 5. Insert ke Tabel Kantin
         $kantin_id = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x', mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0x0fff) | 0x4000, mt_rand(0, 0x3fff) | 0x8000, mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff));
         
-        $stmtKantin = $db->prepare("INSERT INTO kantin (id, user_id, sekolah_id, nama_kantin, foto_kantin, foto_menu, npsn_sekolah, status_sppg, status_sekolah, is_aktif, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', 0, NOW())");
-        $stmtKantin->execute([$kantin_id, $user_id, $real_sekolah_id, $nama_kantin, $foto_kantin_path, $foto_menu_path, $wilayah_id]);
+        $stmtKantin = $db->prepare("INSERT INTO kantin (id, user_id, sekolah_id, nama_kantin, pemilik, foto_kantin, foto_menu, npsn_sekolah, kapasitas_porsi, status_sppg, status_sekolah, is_aktif, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', 0, NOW())");
+        $stmtKantin->execute([$kantin_id, $user_id, $real_sekolah_id, $nama_kantin, $nama_pemilik, $foto_kantin_path, $foto_menu_path, $wilayah_id, $kapasitas_porsi]);
 
         $db->commit();
 

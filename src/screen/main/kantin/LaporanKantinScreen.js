@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  View, Text, StyleSheet, TouchableOpacity, useWindowDimensions, 
-  StatusBar, FlatList, ActivityIndicator, Alert, ScrollView, Image, RefreshControl
+import {
+  View, Text, StyleSheet, TouchableOpacity, useWindowDimensions,
+  StatusBar, FlatList, ActivityIndicator, Alert, ScrollView, Image, RefreshControl, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import apiClient from '../../../api/client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -14,6 +15,15 @@ const WHITE = '#FFFFFF';
 const TEXT_MAIN = '#1E293B';
 const TEXT_MUTED = '#64748B';
 const SUCCESS = '#10B981';
+
+const formatDateLocal = (date) => {
+  if (!date) return '';
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export default function LaporanKantinScreen({ navigation }) {
   const { width } = useWindowDimensions();
@@ -29,6 +39,12 @@ export default function LaporanKantinScreen({ navigation }) {
   });
   const [riwayat, setRiwayat] = useState([]);
 
+  // DATE FILTER STATE
+  const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [endDate, setEndDate] = useState(new Date());
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+
   useEffect(() => {
     loadUserData();
   }, []);
@@ -38,15 +54,21 @@ export default function LaporanKantinScreen({ navigation }) {
     if (dataStr) {
       const parsed = JSON.parse(dataStr);
       setUserData(parsed);
-      fetchData(parsed.id);
+      fetchData(parsed.id, startDate, endDate);
     }
   };
 
-  const fetchData = useCallback(async (kantinId) => {
-    if (!kantinId) return;
+  const fetchData = useCallback(async (kantinId, start = startDate, end = endDate) => {
+    if (!kantinId) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     try {
       setErrorOccurred(false);
-      const res = await apiClient.get(`kantin/kantin_get_laporan.php?kantin_id=${kantinId}`);
+      const startStr = formatDateLocal(start);
+      const endStr = formatDateLocal(end);
+      const res = await apiClient.get(`kantin/kantin_get_laporan.php?kantin_id=${kantinId}&start_date=${startStr}&end_date=${endStr}`);
       if (res.data.status === 'success') {
         setStats(res.data.stats);
         setRiwayat(res.data.riwayat);
@@ -58,36 +80,39 @@ export default function LaporanKantinScreen({ navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [startDate, endDate]);
 
   useFocusEffect(
     React.useCallback(() => {
       if (userData?.id) {
-        fetchData(userData.id);
+        fetchData(userData.id, startDate, endDate);
       }
-    }, [userData?.id])
+    }, [userData?.id, startDate, endDate])
   );
 
+  const isFocused = useIsFocused();
+
   useEffect(() => {
+    if (!isFocused) return;
     const interval = setInterval(() => {
-      if (userData?.id) fetchData(userData.id);
-    }, 10000);
+      if (userData?.id) fetchData(userData.id, startDate, endDate);
+    }, 3000);
     return () => clearInterval(interval);
-  }, [userData?.id]);
+  }, [userData?.id, startDate, endDate, isFocused, fetchData]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchData(userData?.id);
+    fetchData(userData?.id, startDate, endDate);
   };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      
+
       <View style={styles.header}>
-        <Image 
-          source={require('../../../../assets/batik_cirebon.png')} 
-          style={styles.batikOverlay} 
+        <Image
+          source={require('../../../../assets/batik_cirebon.png')}
+          style={styles.batikOverlay}
         />
         <SafeAreaView>
           <View style={styles.headerTop}>
@@ -96,7 +121,52 @@ export default function LaporanKantinScreen({ navigation }) {
               <Feather name="bar-chart-2" size={22} color={WHITE} />
             </View>
           </View>
-          <Text style={styles.headerSubtitle}>Pantau pendapatan dan transaksi Anda secara realtime</Text>
+
+          <View style={styles.dateFilterContainer}>
+            <TouchableOpacity
+              style={styles.dateBtn}
+              onPress={() => setShowStartPicker(true)}
+            >
+              <Text style={styles.dateLabel}>DARI TANGGAL</Text>
+              <View style={styles.dateValRow}>
+                <Ionicons name="calendar-outline" size={16} color={WHITE} />
+                <Text style={styles.dateValText}>{startDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</Text>
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.dateArrow}>
+              <Ionicons name="arrow-forward" size={16} color="rgba(255,255,255,0.4)" />
+            </View>
+
+            <TouchableOpacity
+              style={styles.dateBtn}
+              onPress={() => setShowEndPicker(true)}
+            >
+              <Text style={styles.dateLabel}>SAMPAI TANGGAL</Text>
+              <View style={styles.dateValRow}>
+                <Ionicons name="calendar-outline" size={16} color={WHITE} />
+                <Text style={styles.dateValText}>{endDate.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {showStartPicker && (
+            <DateTimePicker
+              value={startDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(e, date) => { setShowStartPicker(false); if (date) setStartDate(date); }}
+            />
+          )}
+
+          {showEndPicker && (
+            <DateTimePicker
+              value={endDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={(e, date) => { setShowEndPicker(false); if (date) setEndDate(date); }}
+            />
+          )}
         </SafeAreaView>
       </View>
 
@@ -118,53 +188,18 @@ export default function LaporanKantinScreen({ navigation }) {
             </TouchableOpacity>
           </View>
         ) : (
-          <ScrollView 
-            showsVerticalScrollIndicator={false} 
+          <ScrollView
+            showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 120 }}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[BLUE_PRIMARY]} />}
           >
-            
-            <View style={styles.metricsGrid}>
-              <View style={styles.metricCard}>
-                <View style={[styles.iconBox, { backgroundColor: '#F0FDF4' }]}>
-                  <Ionicons name="wallet" size={20} color={SUCCESS} />
-                </View>
-                <Text style={styles.metricVal}>{Number(stats.total_pts).toLocaleString('id-ID')} PTS</Text>
-                <Text style={styles.metricLab}>Total Pendapatan</Text>
-                <Text style={styles.cashEstimate}>Estimasi: Rp {(stats.total_pts * 15000).toLocaleString('id-ID')}</Text>
-              </View>
-              <View style={styles.metricCard}>
-                <View style={[styles.iconBox, { backgroundColor: '#EEF2FF' }]}>
-                  <Ionicons name="receipt" size={20} color="#4F46E5" />
-                </View>
-                <Text style={styles.metricVal}>{stats.total_transaksi}</Text>
-                <Text style={styles.metricLab}>Total Transaksi</Text>
-                <Text style={styles.metricSubNote}>Siswa terlayani</Text>
-              </View>
-              <View style={styles.metricCard}>
-                <View style={[styles.iconBox, { backgroundColor: '#FFF7ED' }]}>
-                  <Ionicons name="trending-up" size={20} color="#F59E0B" />
-                </View>
-                <Text style={styles.metricVal}>{stats.rata_rata} PTS</Text>
-                <Text style={styles.metricLab}>Rata-rata/Siswa</Text>
-                <Text style={styles.metricSubNote}>Per porsi makanan</Text>
-              </View>
-              <View style={styles.metricCard}>
-                <View style={[styles.iconBox, { backgroundColor: '#FAF5FF' }]}>
-                  <Ionicons name="calendar" size={20} color="#8B5CF6" />
-                </View>
-                <Text style={styles.metricVal}>{stats.transaksi_minggu_ini}</Text>
-                <Text style={styles.metricLab}>Minggu Ini</Text>
-                <Text style={styles.metricSubNote}>7 hari terakhir</Text>
-              </View>
-            </View>
 
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Riwayat Transaksi Terkini</Text>
                 <View style={styles.realtimeBadge}>
-                   <View style={styles.liveDot} />
-                   <Text style={styles.realtimeText}>LIVE</Text>
+                  <View style={styles.liveDot} />
+                  <Text style={styles.realtimeText}>LIVE</Text>
                 </View>
               </View>
 
@@ -176,8 +211,8 @@ export default function LaporanKantinScreen({ navigation }) {
                     <Text style={styles.emptyText}>Transaksi scan siswa akan muncul di sini secara realtime.</Text>
                   </View>
                 ) : (
-                  riwayat.map((item) => (
-                    <View key={item.id} style={styles.listItem}>
+                  riwayat.map((item, idx) => (
+                    <View key={`riwayat_${item.id}_${idx}`} style={styles.listItem}>
                       <View style={styles.listIconBox}>
                         <Ionicons name="person" size={20} color={BLUE_PRIMARY} />
                       </View>
@@ -224,12 +259,46 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 24, fontWeight: 'bold', color: WHITE },
   headerSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 8 },
   iconBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
-  
+
+  dateFilterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 25,
+    gap: 10
+  },
+  dateBtn: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    padding: 12,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)'
+  },
+  dateLabel: {
+    fontSize: 9,
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: 'bold',
+    marginBottom: 4
+  },
+  dateValRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  dateValText: {
+    color: WHITE,
+    fontSize: 14,
+    fontWeight: 'bold'
+  },
+  dateArrow: {
+    paddingTop: 15
+  },
+
   whiteSection: { flex: 1, backgroundColor: '#F8FAFC', borderTopLeftRadius: 40, borderTopRightRadius: 40, paddingHorizontal: 25, paddingTop: 30, marginTop: -30 },
-  
+
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 },
   loadingText: { fontSize: 14, fontWeight: 'bold', color: '#94A3B8', marginTop: 15 },
-  
+
   errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20, paddingTop: 60 },
   errorTitle: { fontSize: 18, fontWeight: '900', color: BLUE_PRIMARY, marginTop: 20 },
   errorDesc: { fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 10, lineHeight: 18 },

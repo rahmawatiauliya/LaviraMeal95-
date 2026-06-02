@@ -14,7 +14,7 @@ const SOFT_BG = '#F8FAFC';
 const TEXT_MAIN = '#1E293B';
 const TEXT_MUTED = '#64748B';
 
-export default function Login1({ navigation }) {
+export default function ChooseRoleScreen({ navigation }) {
     const fadeAnim = useState(new Animated.Value(0))[0];
     const slideAnim = useState(new Animated.Value(30))[0];
 

@@ -8,7 +8,7 @@ if ($method == 'GET') {
     try {
         // Ambil data kantin yang belum disetujui SPPG
         $query = "SELECT u.id as user_id, u.nama as pemilik, u.nama as pengelola, u.username, u.email, 
-                         k.id as id, k.id as kantin_id, k.nama_kantin, k.foto_kantin, k.foto_menu, k.npsn_sekolah,
+                         k.id as id, k.id as kantin_id, k.nama_kantin, k.foto_kantin, k.foto_menu, k.npsn_sekolah, k.kapasitas_porsi, k.status_sekolah,
                          'Menunggu Verifikasi' as status, k.created_at,
                          s.nama_sekolah as sekolah,
                          (CASE WHEN k.status_sekolah = 'approved' THEN 1 ELSE 0 END) as verified_by_school,

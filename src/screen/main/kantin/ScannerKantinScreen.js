@@ -49,7 +49,7 @@ export default function ScannerKantinScreen({ navigation }) {
       if (response.data && response.data.status === 'success') {
         const menuDetail = response.data.menu_detail;
         const menuName = menuDetail ? menuDetail.nama_menu : 'Paket Makan LaviraMeal';
-        
+
         Alert.alert(
           "Berhasil",
           `Siswa: ${response.data.student_name}\nMenu: ${menuName}\nSaldo dipotong: ${response.data.deducted_points} PTS`,
@@ -102,10 +102,10 @@ export default function ScannerKantinScreen({ navigation }) {
             <View style={[styles.corner, styles.bottomRight]} />
           </View>
           <Text style={styles.hintText}>Arahkan kamera ke QR Code Siswa</Text>
-          
+
           <View style={styles.infoBox}>
             <MaterialCommunityIcons name="information-outline" size={16} color="rgba(255,255,255,0.6)" />
-            <Text style={styles.infoText}>Sistem akan otomatis memotong saldo siswa sebesar 15 PTS untuk 1 porsi makan.</Text>
+            <Text style={styles.infoText}>Sistem akan otomatis memotong saldo siswa sebesar 1 PTS untuk 1 porsi makan.</Text>
           </View>
         </View>
 

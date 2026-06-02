@@ -31,40 +31,57 @@ if ($method == 'POST') {
         $kantin_id = $kantin['id'];
         $nama_kantin = $kantin['nama_kantin'];
 
-        // 2. Cari data Siswa berdasarkan qr_code_token atau username atau nis
+        // 2. Cari data Pelanggan berdasarkan qr_code_token atau username atau nis
         $stmtSiswa = $db->prepare("
-            SELECT s.id, s.user_id, s.saldo, s.nama, s.nis, s.sekolah_id 
+            SELECT s.id, s.user_id, s.saldo, s.nama, s.nis, s.sekolah_id, 'siswa' as role 
             FROM siswa s 
             LEFT JOIN users u ON s.user_id = u.id
             WHERE s.qr_code_token = ? OR s.nis = ? OR u.username = ?
             LIMIT 1
         ");
         $stmtSiswa->execute([$student_token, $student_token, $student_token]);
-        $siswa = $stmtSiswa->fetch(PDO::FETCH_ASSOC);
+        $pelanggan = $stmtSiswa->fetch(PDO::FETCH_ASSOC);
 
-        if (!$siswa) {
-            throw new Exception("Siswa dengan token tersebut tidak terdaftar.");
+        if (!$pelanggan) {
+            $stmtGuru = $db->prepare("
+                SELECT g.id, g.user_id, g.saldo, g.nama, g.nip as nis, g.sekolah_id, 'guru' as role 
+                FROM guru g 
+                LEFT JOIN users u ON g.user_id = u.id
+                WHERE u.username = ? OR g.nip = ?
+                LIMIT 1
+            ");
+            $stmtGuru->execute([$student_token, $student_token]);
+            $pelanggan = $stmtGuru->fetch(PDO::FETCH_ASSOC);
         }
 
-        $siswa_id = $siswa['id'];
-        $nama_siswa = $siswa['nama'];
-        $saldo_siswa = (float)$siswa['saldo'];
+        if (!$pelanggan) {
+            throw new Exception("Siswa/Guru dengan token tersebut tidak terdaftar.");
+        }
+
+        $pelanggan_id = $pelanggan['id'];
+        $nama_siswa = $pelanggan['nama']; // Keep variable name same for response backward compatibility
+        $saldo_pelanggan = (float)$pelanggan['saldo'];
+        $role_pelanggan = $pelanggan['role'];
         
-        // 3. Validasi Saldo Siswa (Minimal 1 PTS)
+        // 3. Validasi Saldo Pelanggan (Minimal 1 PTS)
         $nominal_transaksi = 1; // 1 PTS per porsi (atau 1 Kuota Makan)
-        if ($saldo_siswa < $nominal_transaksi) {
-            throw new Exception("Poin siswa tidak mencukupi. (Saldo: $saldo_siswa PTS, Butuh: $nominal_transaksi PTS)");
+        if ($saldo_pelanggan < $nominal_transaksi) {
+            throw new Exception("Poin tidak mencukupi. (Saldo: $saldo_pelanggan PTS, Butuh: $nominal_transaksi PTS)");
         }
 
         // 3.5 Ambil Detail Menu Makanan Kantin Terkini
-        $stmtMenu = $db->prepare("SELECT id, nama_menu, foto, harga FROM menu_harian WHERE kantin_id = ? ORDER BY tanggal DESC LIMIT 1");
+        $stmtMenu = $db->prepare("SELECT id, nama_menu, foto_menu FROM menu_harian WHERE kantin_id = ? ORDER BY tanggal DESC LIMIT 1");
         $stmtMenu->execute([$kantin_id]);
         $menu_makanan = $stmtMenu->fetch(PDO::FETCH_ASSOC);
         $nama_menu = $menu_makanan ? $menu_makanan['nama_menu'] : 'Paket Makan LaviraMeal';
 
-        // 4. Potong Saldo Siswa
-        $stmtPotong = $db->prepare("UPDATE siswa SET saldo = saldo - ? WHERE id = ?");
-        $stmtPotong->execute([$nominal_transaksi, $siswa_id]);
+        // 4. Potong Saldo Pelanggan
+        if ($role_pelanggan == 'siswa') {
+            $stmtPotong = $db->prepare("UPDATE siswa SET saldo = saldo - ? WHERE id = ?");
+        } else {
+            $stmtPotong = $db->prepare("UPDATE guru SET saldo = saldo - ? WHERE id = ?");
+        }
+        $stmtPotong->execute([$nominal_transaksi, $pelanggan_id]);
 
         // 4.5 Tambahkan Saldo ke Kantin yang di-scan (Patch kolom saldo jika belum ada)
         try { 
@@ -75,23 +92,42 @@ if ($method == 'POST') {
         $stmtTambah = $db->prepare("UPDATE kantin SET saldo = saldo + ? WHERE id = ?");
         $stmtTambah->execute([$nominal_transaksi, $kantin_id]);
 
-        // 5. Catat transaksi di tabel transaksi_siswa
+        // 5. Catat transaksi di tabel transaksi
         $message = "Makan di Kantin $nama_kantin ($nama_menu)";
-        $stmtTrans = $db->prepare("
-            INSERT INTO transaksi_siswa (siswa_id, kantin_id, type, category, nominal, message) 
-            VALUES (?, ?, 'keluar', 'Makan', ?, ?)
-        ");
-        $stmtTrans->execute([$siswa_id, $kantin_id, $nominal_transaksi, $message]);
-
-        // 6. Catat pengambilan ke tabel siswa_pengambilan_mbg (Untuk statistik konsumsi harian)
-        try {
-            $stmtMbg = $db->prepare("
-                INSERT INTO siswa_pengambilan_mbg (siswa_id, sekolah_id, tanggal) 
-                VALUES (?, ?, NOW())
+        if ($role_pelanggan == 'siswa') {
+            $stmtTrans = $db->prepare("
+                INSERT INTO transaksi_siswa (siswa_id, kantin_id, type, category, nominal, message) 
+                VALUES (?, ?, 'keluar', 'Makan', ?, ?)
             ");
-            $stmtMbg->execute([$siswa_id, $siswa['sekolah_id']]);
-        } catch (Exception $e_mbg) {
-            // Jika ada kendala minor pada tabel mbg, jangan gagalkan transaksi utama
+        } else {
+            $stmtTrans = $db->prepare("
+                INSERT INTO transaksi_guru (guru_id, kantin_id, type, category, nominal, message) 
+                VALUES (?, ?, 'keluar', 'Makan', ?, ?)
+            ");
+        }
+        $stmtTrans->execute([$pelanggan_id, $kantin_id, $nominal_transaksi, $message]);
+
+        // 6. Catat pengambilan ke tabel pengambilan_mbg (Untuk statistik konsumsi harian)
+        if ($role_pelanggan == 'siswa') {
+            try {
+                $stmtMbg = $db->prepare("
+                    INSERT INTO siswa_pengambilan_mbg (siswa_id, sekolah_id, tanggal) 
+                    VALUES (?, ?, NOW())
+                ");
+                $stmtMbg->execute([$pelanggan_id, $pelanggan['sekolah_id']]);
+            } catch (Exception $e_mbg) {
+                error_log("Error inserting to siswa_pengambilan_mbg: " . $e_mbg->getMessage());
+            }
+        } else {
+            try {
+                $stmtMbg = $db->prepare("
+                    INSERT INTO guru_pengambilan_mbg (guru_id, sekolah_id, tanggal) 
+                    VALUES (?, ?, NOW())
+                ");
+                $stmtMbg->execute([$pelanggan_id, $pelanggan['sekolah_id']]);
+            } catch (Exception $e_mbg) {
+                error_log("Error inserting to guru_pengambilan_mbg: " . $e_mbg->getMessage());
+            }
         }
 
         $db->commit();

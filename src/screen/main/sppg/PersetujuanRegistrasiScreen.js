@@ -160,8 +160,9 @@ export default function PersetujuanRegistrasiScreen({ navigation }) {
                 <Text style={styles.sectionLabel}>Data Kantin</Text>
                 <View style={styles.detailBox}>
                   <Text style={styles.detailText}><Text style={styles.bold}>Nama Kantin:</Text> {selectedUser.nama_kantin}</Text>
-                  <Text style={styles.detailText}><Text style={styles.bold}>NPSN Sekolah:</Text> {selectedUser.npsn_sekolah}</Text>
+                  <Text style={styles.detailText}><Text style={styles.bold}>Nama Sekolah:</Text> {selectedUser.sekolah || selectedUser.npsn_sekolah}</Text>
                   <Text style={styles.detailText}><Text style={styles.bold}>Status Sekolah:</Text> {selectedUser.status_sekolah?.toUpperCase() || '-'}</Text>
+                  <Text style={styles.detailText}><Text style={styles.bold}>Porsi Harian:</Text> {selectedUser.kapasitas_porsi || '0'} Porsi</Text>
                 </View>
 
                 <Text style={styles.sectionLabel}>Foto Kantin</Text>

@@ -25,27 +25,22 @@ try {
     // Koreksi semua status transfer menjadi 'Berhasil'
     $db->exec("UPDATE transaksi_dana SET status = 'Berhasil'");
 
-    // 1. Ambil Riwayat Distribusi & Petugas Penerima
+    // 1. Ambil Riwayat Registrasi/Verifikasi Kantin Mitra
     $query_riwayat = "
         SELECT 
-            s.id as sekolah_id,
-            s.nama_sekolah,
-            jd.tanggal,
-            jd.sesi,
-            f.petugas_penerima,
+            k.id,
             k.nama_kantin,
-            jd.kuota_porsi as jumlah_makan,
-            jd.status
-        FROM jadwal_distribusi jd
-        JOIN sekolah s ON jd.sekolah_id = s.id
-        JOIN kantin k ON jd.kantin_id = k.id
-        LEFT JOIN feedback_kantin f ON jd.id = f.jadwal_id
-        WHERE jd.sppg_id = ? AND jd.tanggal BETWEEN ? AND ?
-        ORDER BY jd.tanggal DESC
+            s.nama_sekolah,
+            DATE_FORMAT(k.created_at, '%Y-%m-%d') as tanggal,
+            k.status_sppg as status
+        FROM kantin k
+        JOIN sekolah s ON k.sekolah_id = s.id
+        WHERE s.sppg_id = ? AND k.created_at BETWEEN ? AND ?
+        ORDER BY k.created_at DESC
         LIMIT 100
     ";
     $stmt_riwayat = $db->prepare($query_riwayat);
-    $stmt_riwayat->execute([$sppg_id, $start_date, $end_date]);
+    $stmt_riwayat->execute([$sppg_id, $start_date . ' 00:00:00', $end_date . ' 23:59:59']);
     $riwayat = $stmt_riwayat->fetchAll(PDO::FETCH_ASSOC);
 
     // 2. Kantin Terlaris (Ranking)

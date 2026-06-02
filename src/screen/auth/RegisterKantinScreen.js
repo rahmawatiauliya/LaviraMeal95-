@@ -30,7 +30,8 @@ export default function RegisterKantinScreen({ navigation }) {
     wilayah_nama: '',
     username: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    kapasitas_porsi: ''
   });
 
   const [fotoKantin, setFotoKantin] = useState(null);
@@ -97,9 +98,9 @@ export default function RegisterKantinScreen({ navigation }) {
   };
 
   const handleRegister = async () => {
-    const { nama_pemilik, email_pemilik, nama_kantin, wilayah_id, username, password, confirmPassword } = formData;
+    const { nama_pemilik, email_pemilik, nama_kantin, wilayah_id, username, password, confirmPassword, kapasitas_porsi } = formData;
 
-    if (!nama_pemilik || !email_pemilik || !nama_kantin || !wilayah_id || !username || !password) {
+    if (!nama_pemilik || !email_pemilik || !nama_kantin || !wilayah_id || !username || !password || !kapasitas_porsi) {
       Alert.alert("Lengkapi Data", "Semua kolom wajib diisi.");
       return;
     }
@@ -123,24 +124,43 @@ export default function RegisterKantinScreen({ navigation }) {
       data.append('wilayah_id', wilayah_id);
       data.append('username', username);
       data.append('password', password);
+      data.append('kapasitas_porsi', kapasitas_porsi);
       
       // Append Foto Kantin
       const uriK = fotoKantin.uri;
+      let nameK = uriK.split('/').pop().split('?')[0];
+      if (!nameK.includes('.')) {
+        nameK = nameK + '.jpg';
+      }
+      const extK = nameK.split('.').pop().toLowerCase();
+      const typeK = `image/${extK === 'png' ? 'png' : 'jpeg'}`;
+      
       data.append('foto_kantin', { 
         uri: uriK, 
-        name: uriK.split('/').pop(), 
-        type: `image/${uriK.split('.').pop()}` 
+        name: nameK, 
+        type: typeK 
       });
 
       // Append Foto Menu
       const uriM = fotoMenu.uri;
+      let nameM = uriM.split('/').pop().split('?')[0];
+      if (!nameM.includes('.')) {
+        nameM = nameM + '.jpg';
+      }
+      const extM = nameM.split('.').pop().toLowerCase();
+      const typeM = `image/${extM === 'png' ? 'png' : 'jpeg'}`;
+
       data.append('foto_menu', { 
         uri: uriM, 
-        name: uriM.split('/').pop(), 
-        type: `image/${uriM.split('.').pop()}` 
+        name: nameM, 
+        type: typeM 
       });
 
-      const response = await apiClient.post('auth/register_kantin.php', data);
+      const response = await apiClient.post('auth/register_kantin.php', data, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
 
       if (response.data.status === 'success') {
         Alert.alert("Pendaftaran Berhasil", response.data.message, [
@@ -238,6 +258,20 @@ export default function RegisterKantinScreen({ navigation }) {
                    placeholder="Contoh: Kantin Sehat 1"
                    value={formData.nama_kantin}
                    onChangeText={(t) => setFormData({...formData, nama_kantin: t})}
+                 />
+              </View>
+           </View>
+
+           <View style={styles.inputGroup}>
+              <Text style={styles.label}>Porsi yang Disediakan Harian</Text>
+              <View style={styles.inputBox}>
+                 <MaterialCommunityIcons name="food-fork-drink" size={18} color={TEXT_MUTED} style={styles.inputIcon} />
+                 <TextInput 
+                   style={styles.textInput}
+                   placeholder="Contoh: 100"
+                   keyboardType="numeric"
+                   value={formData.kapasitas_porsi}
+                   onChangeText={(t) => setFormData({...formData, kapasitas_porsi: t.replace(/[^0-9]/g, '')})}
                  />
               </View>
            </View>

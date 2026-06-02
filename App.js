@@ -5,7 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 // Import Screens
 import LoginScreen from './src/screen/auth/LoginScreen';
-import Login1 from './src/screen/auth/login1';
+import ChooseRoleScreen from './src/screen/auth/ChooseRoleScreen';
 import ForgotPasswordScreen from './src/screen/auth/ForgotPasswordScreen';
 import HomeScreen from './src/screen/main/sppg/HomeScreenSppg';
 import HomeSekolahScreen from './src/screen/main/admin_sekolah/HomeScreenSekolah';
@@ -72,8 +72,8 @@ export default function App() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
-            name="Login1"
-            component={Login1}
+            name="ChooseRole"
+            component={ChooseRoleScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen

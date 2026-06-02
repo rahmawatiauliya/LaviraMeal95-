@@ -10,6 +10,14 @@ if (!$kantin_id) {
 }
 
 try {
+    // 0. Resolve if kantin_id is actually user_id
+    $stmtKantin = $db->prepare("SELECT id FROM kantin WHERE user_id = ? OR id = ? LIMIT 1");
+    $stmtKantin->execute([$kantin_id, $kantin_id]);
+    $kantin = $stmtKantin->fetch(PDO::FETCH_ASSOC);
+    
+    if ($kantin) {
+        $kantin_id = $kantin['id'];
+    }
     // 1. Ambil list feedback
     $stmt = $db->prepare("
         SELECT id, rating, komentar as review, petugas_penerima as reviewer_name, created_at, photo 
